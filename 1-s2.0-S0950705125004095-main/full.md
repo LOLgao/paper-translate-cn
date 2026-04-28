@@ -1,0 +1,662 @@
+# Multilevel structure fusion for community detection in heterogeneous graphs via disrupting heterophily
+
+![](images/ad022df09f827ede27b71d7ff5fff0eb35b463c7d145b9f8b2bee8f6268f173f.jpg)
+
+Mengying Dai a , Weimin Li a ,∗, Xinyi Zhang a , Fangfang Liu a , Mingjun Xin a, Can Wang
+
+a School of Computer Engineering and Science, Shanghai University, Shanghai, China   
+b School of Information and Communication Technology, Griffith University, Australia
+
+# A R T I C L E I N F O
+
+Keywords:
+
+Multilevel structure fusion
+
+Structural heterophily
+
+Contrastive learning
+
+Unsupervised community detection
+
+Heterophilous heterogeneous graph
+
+# A B S T R A C T
+
+Existing community detection methods of heterogeneous graphs focus on homophilous heterogeneous graphs, which generally use GNNs and HGNNs. In heterogeneous graphs with heterophily, the two nodes connected by metapaths often have different labels, and existing methods result in representation collapse among nodes from different communities. To address the challenges posed by structural heterophily and to enhance the strength of homophily, an unsupervised community detection method with multilevel structure fusion oriented by homophily, called SFCDH, is proposed. This method demonstrates a strong generalization capabilities across various homophilous and heterophilous heterogeneous graphs. Specifically, SFCDH consists of two modules named hierarchical structure fusion module based on homophily ratio sampling and the unsupervised graph representation learning module based on generative and contrastive learning. The first module constructs a fine-grained high-order fusion graph based on the network homophily and divides the community into multigranularity via a hierarchical abstraction tree to improve the generalization ability of the model to different metapath subgraphs. Subsequently, the second module uses contrastive loss based on community prototypes to guide the graph in generating dynamic masks and enhances the ability of SFCDH to learn attributes and complex semantics by using graph autoencoder. Ultimately, node embeddings at the metapath level and the tree level are combined to achieve multilevel structural fusion for unsupervised community detection. Extensive experiments on six publicly available datasets demonstrate the superiority of SFCDH over state-of-the-art baselines. Notably, in the heterophilous heterogeneous graph IMDB, SFCDH outperforms the second-place model by $1 1 \%$ in accuracy, which further validating its effectiveness.
+
+# 1. Introduction
+
+Complex systems in the real world can be abstracted and modeled as complex networks, such as social networks [1], bioinformatics networks [2], and transportation networks [3]. Nodes in a complex network represent a certain class of entities, while connected edges represent interrelationships between two entities. Community detection aims to identify distinct communities within complex networks, where internal nodes are tightly connected while connections between external nodes are sparse.
+
+Heterogeneous graphs consist of multiple types of nodes and edges, offering richer structures and semantic information compared to homogeneous graphs. For instance, in Fig. 1(a), author nodes A1 and A2 lack direct edges but are connected through the metapath APA, indicating that they co-authored a paper. It is difficult to classify both nodes into the same community using traditional homogeneous graph
+
+community detection methods. As a result, heterogeneous graphs pose a significant challenge for community detection, highlighting the need for specialized methods tailored to these complex structures.
+
+Most existing methods for detecting communities in heterogeneous graphs involve extracting various metapaths and treating them as homogeneous graphs. Standard graph embedding techniques such as GNNs are then used to identify communities within the graph by learning node embeddings. Accordingly, Luo et al. [4] constructed a GNN based on contextual paths to detect heterogeneous graphs and applied contextual paths to capture high-order relationships between nodes. Using a hierarchical attention mechanism, Zhao et al. [5] aggregated heterogeneous graph structure information by proposing a graph autoencoder with a hierarchical attention mechanism, applying nonnegative matrix decomposition for learning graph community semantic information and ultimately optimizing both in a unified way. Tian
+
+![](images/308cf7d6665d3f0c7fb805067be0b65229c2aecddae1d9cf64dfc029a76287eb.jpg)  
+Fig. 1. (a) Heterogeneous graph with four types of nodes (Author, Paper, Conference, Term) and three types of edges (Write, Published in, Belong to). (b) Example of feature aggregation in homophlious graphs and heterophilous graphs.
+
+et al. [6] computed the reconstruction loss and learned the node embeddings by masking the attribute, topology, and positional information for each homogeneous subgraph. The GNN, HGNN, etc., used in the above methods are based on the homophily assumption, which presumes that nodes of the same community will be more likely to be interconnected. Generally, a heterogeneous graph does not always satisfy the homophily assumption since a homogeneous subgraph derived from metapaths can also include a high number of heterophily edges.
+
+In Fig. 1(b), the homogeneous subgraph obtained through the metapath consists of Author nodes, which can be either homophlious or heterophilous. A solid line represents a homophily edge, indicating that both connected nodes belong to the same community, while a dashed line denotes a heterophily edge, connecting nodes from different communities. A heterophilous graph contains many heterophily edges, whereas a homophilous graph has few. Excessive inter-class edges in a heterophilous graph can cause features of nodes from different communities to mix after aggregation, making them indistinguishable [7]. As shown in Fig. 1(b), for indistinguishable boundary nodes, the homophily structure provides more valuable information for their aggregated features than the original node features. Conversely, the lack of homophily, i.e., heterphily, is a significant reason for GNN’s and HGNN’s inferiority on heterophilous graphs. Boundary nodes typically have more heterophilic neighbors than homophilic ones. Since heterphily edges connect different classes of nodes, they can lead to mixed and indistinguishable node embeddings, blurring the boundaries between communities.
+
+Thus, the aforementioned method is generally more effective in homophilous heterogeneous graphs but less so in heterophilous heterogeneous graphs.
+
+# 1.1. Motivations
+
+It proves challenging to develop a method for detecting communities in an unsupervised way, which applies to homophilous and heterophilous heterogeneous graphs. The motivations for this paper are as follows:
+
+M1: Addressing the complex structural and semantic information in heterogeneous graphs becomes particularly challenging in the presence of missing or noisy labels. An unsupervised approach is essential for managing the multiple types of nodes within these graphs. By leveraging the rich semantic information available, we can enhance community detection effectiveness.
+
+M2: Avoiding representation collapse among nodes from different communities in heterophilous heterogeneous graphs is crucial for preserving the unique characteristics and relationships of these diverse nodes. When working with heterogeneous graphs, it is important to implement strategies that minimize structural heterophily while amplifying homophily.
+
+# 1.2. Contributions
+
+This paper proposes an unsupervised community detection framework that disrupts the structural heterophily and enhances the strength
+
+of homophily. The framework generates metapath level node embeddings and hierarchical tree level node embeddings to complete multilevel structure fusion. It uses generative learning and contrastive learning to finish unsupervised representation learning. According to our knowledge, this paper presents the first unsupervised community detection method for homophilous and heterophilous heterogeneous graphs.
+
+The main contributions of this paper are as follows:
+
+(1) A unified framework is proposed for a hierarchical structure fusion module (SFR) based on homophily ratio sampling and an unsupervised graph representation learning module (UGC) for generative and contrastive learning. This model demonstrates strong generalization ability across various homophilous and heterophilous heterogeneous graphs;   
+(2) The proposed SFR emphasizes adaptive high-order subgraph aggregation using different metapaths to create a fine-grained high-order graph. In addition, an abstraction tree is constructed from this high-order graph using structural entropy to learn stable node embeddings. This module enhances the influence of homophily edges while weakening the influence of heterophily edges;   
+(3) The proposed UGC integrates contrastive learning with generative learning, utilizing community prototype-based contrastive loss alongside a dynamic graph masked autoencoder to compute the loss of features and structures before and after reconstruction. During model training, this module dynamically enhances the learning of node features and heterogeneous graph semantics;   
+(4) Extensive experiments on 6 publicly heterogeneous graph datasets, including homophilous and heterophilous heterogeneous graphs, demonstrate the effectiveness and generalizability of SFCDH compared to 11 state-of-the-art baselines. Notably, in the heterophilous heterogeneous graph dataset IMDB, SFCDH outperforms the second-place model by $1 1 \%$ in accuracy, further validating its effectiveness.
+
+The rest of this paper is organized as follows: Section 2 reviews some related works. Section 3 provides a comprehensive overview of some preliminary knowledge. Section 4 presents our proposed model. Section 5 reports experimental results and analyses. Finally, the conclusions and future work of the paper are summarized in Section 6.
+
+# 2. Related work
+
+# 2.1. Homogeneous graph community detection
+
+Community detection has received considerable attention in recent decades as a hot spot in network research. The traditional approach to community detection focuses on dividing network nodes into different communities based on their local topologies. Shi et al. [8] proposed an improved pairwise constrained non-negative symmetric matrix decomposition method that imposes pairwise constraints generated from real community information to improve community detection performance. He et al. [9] first applied Markov Random Fields to network
+
+analysis to encode the structural properties of irregular networks as energy functions, such that the minimization of the energy function produces the most appropriate community structure. Gianluca Bonifazi et al. [10] used disseminator centrality to detect information diffusion across different communities in social networks. Further to address the issue of dynamics, they investigated the surprise factor in community evolutionary patterns during both non-dangerous and dangerous challenges [11]. Kang et al. [12] proposed a multi-neighborhood-based local search strategy featuring a dynamic grouping mechanism and redefined individual update rules. This approach applies community detection methods to robotic task assignment in agriculture. Kong et al. [13] decomposed adjacency and attribute matrices symmetrically to optimize the community membership matrix by utilizing rich multidomain information to detect communities in complex attribute networks. The joint decomposition of multiple data leads to a high computational complexity. Using motifs, Li et al. [14] aggregated multiplex networks into single-layer multiplex networks for community detection by extracting high-order interactions at each layer.
+
+Then, many researchers used deep learning to solve community detection. Scholars such as Liu [15] proposed learning the underlying community structure of a network using high-order proximity and overlapping community modularity functions. Hao et al. [16] overcame the problem of insufficient features by organically combining the hierarchical attribute information and topological relationships through multiple graph autoencoders. However, the above methods can lead to over-division or under-division problems. Sun et al. [17] proposed a graph-informax community maximization model that leverages the community information within the network to learn node embeddings. Li et al. [18] combined graph contrastive learning with GCN, which considers the community information and jointly analyzes the community detection and node embeddings in an end-to-end manner.
+
+However, the above approaches focus on homogeneous graphs, fail to handle heterogeneous graphs with multiple node types and relationships, and fail to consider heterophily.
+
+# 2.2. Heterogeneous graph community detection
+
+Few studies focus on heterogeneous network community detection, and the fragmented content and diverse research methods make it challenging to establish a unified system for investigating this topic. Currently, there are two types of heterogeneous network community detection methods available: traditional heterogeneous network community detection methods and deep learning-based heterogeneous graph neural network clustering methods. In general, traditional heterogeneous network community detection methods are not particularly generalizable and are designed for specific network structures. Sun et al. [19] presented a probability-based algorithm for bipartite graphs. Li et al. [20] presented matrix decomposition-based methods for specific network structures. Deep learning-based clustering methods can be broadly classified into two categories based on their approach to handling diverse relations within networks: meta-path and adaptive methods. The former relies on pre-defined meta-paths to capture various semantic relations, and then employs neural networks to represent node information to generate representations, then perform specific clustering tasks based on the representations. Wang et al. [21] proposed the HAN model, which combines the attention mechanism and metapath structure to aggregate the final node embeddings. Zhang et al. [22] presented the HetGNN model which uses LSTM as an aggregator to generate node-level embeddings. However, the ability to capture long-distance relationships is weak. Yun et al. [23] proposed the GTN model which learns different types of metapaths through multi-channel convolution and splice multiple node embeddings as the final node embeddings. However, it consumes a large amount of memory. Adaptive methods mine potential high-order structures to capture relational information and steer the aggregation of node features. He et al. [24] combined heterogeneous community sizes with SBM for link
+
+community detection. Zhao et al. [25] used metapaths to construct multiple homogeneous subgraphs, and on each homogeneous subgraph, recursively utilized the community detection approach to construct a hierarchical graph with node embeddings that preserve community semantics. Wei et al. [26] embedded local node features and global community and organization information into node embeddings by randomly walking and jointly considering community, organization, and attribute information, to detect community and organizational structures simultaneously.
+
+However, the methods mentioned above may require high-quality input data, especially in the case of missing node attributes and noise in the data, which may lead to biased or inaccurate results. Incapable of handling real network nodes with missing attributes or with noise. So, we consider combining graph masked autoencoder with contrastive learning, which utilizes a dynamic masking strategy to perturb the original graph and improve the ability of the model to learn about the graph in an unsupervised way. In addition, the methods above ignore that neighboring nodes in a complex heterogeneous graph have different features that are not perfectly correlated (i.e., the structural heterophily). All of the above methods are based on the homophily assumption and cannot handle heterogeneous graphs with heterophily.
+
+# 2.3. Heterophilous graph representation learning
+
+Heterophilous graphs are also prevalent in life, from interpersonal relationships to scientific studies of protein genes. In heterophily graphs, the focus lies on the contrast between nodes and their neighbors, highlighting a propensity to establish connections between nodes belonging to distinct classes. Several recent studies have endeavored to extend GNNs to effectively address heterophilous graphs. Yang et al. [27] used a diversified message-passing framework that assigns propagation weights to each attribute and adjusted the GNN for heterophilous graphs. Li et al. [28] learned the potential homophily information of the nodes by aggregating the global information. Chien et al. [29] adaptively learned homophily and heterophily node weights and jointly learned node features and topology. Wu et al. [30] used the adaptive deep map convolution technique to achieve adaptive aggregation of local high-order neighborhoods. In response to the heterophily of drug-disease networks, Liu et al. [31] proposed a novel structure-enhanced line graph convolutional network for learning the integrated representation of drug-disease pairs incorporating structural information. In addition, the method has a large memory and time overhead.
+
+Although the above methods alleviate the problem of heterophilous homogeneous graphs. To some extent, they rely on prior knowledge, such as labels for training. Therefore, they are suitable for semisupervised community detection but not for unsupervised community detection and cannot deal with heterogeneous graphs with multiple types of nodes and edges.
+
+In addressing the issue of over-smoothing, Zheng et al. [32] introduced a graph complementary convolution method from a topological space viewpoint. They advocated generating complementary graphs to augment the absent structural details in the original graph data, irrespective of the homophilous or heterophilous nature of the graph structure. Wen et al. [33] enhances node embeddings by considering both low and high frequency signals based on graph homophily. A graph joint aggregation matrix is designed using node features and adjacency relationships to make these signals more distinguishable.
+
+The majority of the mentioned methodologies begin by examining the topological space and addressing the treatment of neighborhood data. They have overlooked the additional detailed information embedded within high-order connections. Nevertheless, during model training, none adequately evaluate whether interconnected nodes belong to the same class, thus limiting their ability to dynamically regulate the significance of disseminated data. This constraint could hinder the model’s adaptability and compromise its overall generalizability.
+
+Table 1 Notations and Explanations.   
+
+<table><tr><td>Notation</td><td>Explanation</td></tr><tr><td>Gφ</td><td>The homogeneous subgraph according to the metapath φ</td></tr><tr><td>HRφ</td><td>The homophily ratio of the homogeneous subgraph Gφ</td></tr><tr><td>o_v</td><td>The community strength of a leaf node v in T</td></tr><tr><td>odφ</td><td>The aggregation order of Gφ</td></tr><tr><td>Aφ</td><td>The masked adjacency matrix of Gφ</td></tr><tr><td>S</td><td>The constructed high-order fusion graph</td></tr><tr><td>T</td><td>The hierarchical abstraction tree based on S</td></tr><tr><td>R*</td><td>The pseudo label of the heterogeneous graph G</td></tr><tr><td>Z</td><td>The node embeddings generated from the masked autoencoder</td></tr><tr><td>ZTree</td><td>The node embeddings generated from tree T</td></tr></table>
+
+# 3. Preliminaries
+
+This section defines some important concepts relevant to this paper and points out the problem that this paper is trying to solve. Some notations and explanations are given in Tabel 1.
+
+Definition 1 (Heterogeneous Information Network). A heterogeneous information network (HIN) is a graph consisting of multiple types of edges and nodes defined as $G \ = \ \left( V , A , T _ { V } , T _ { E } , X , \phi \right)$ , where $V$ and ?? represent the set of nodes and the adjacency matrix, respectively. Where $T _ { V }$ and $T _ { E }$ represent the types of nodes and edges and satisfy $\left| T _ { V } \right| > 1$ or $\left| T _ { E } \right| > 1$ . ?? represents the set of metapaths.
+
+Definition 2 (Metapath). A metapath $\phi ~ \in ~ \phi$ is a relationship in the HIN that connects different types of nodes to different types of edges, defined as $V _ { 0 } \xrightarrow { R _ { 0 } } V _ { 1 } \xrightarrow { R _ { 1 } } \cdots \xrightarrow { R _ { n } } V _ { n + 1 }$ ??1←←←←←←←←←→ . ????←←←←←←←←←←←→ ????+1. ?? represents the type of relationship between the nodes, and $R _ { i }$ represents the relationship between nodes $V _ { i }$ and $V _ { i + 1 }$ .
+
+Definition 3 (Homogeneous Subgraph). For a heterogeneous graph $G$ , given a target node type $\varepsilon \in T _ { V }$ , and a metapath $\phi$ , there exists a homogeneous subgraph $G _ { \phi } = \left( V ^ { \prime } , E ^ { \prime } \right)$ . For any node $v \in V ^ { \prime }$ , the node belongs to the target type ??.
+
+Definition 4 (Metapath Subgraph Homophily Ratio). For the homogeneous subgraph $G _ { \phi } \ : = \ : \left( V ^ { \prime } , E ^ { \prime } \right)$ corresponding to any metapath $\phi$ of the heterogeneous graph $G$ , the homophily ratio $H R ^ { \phi }$ of this graph is calculated as follows:
+
+$$
+H R ^ {\phi} = \frac {\operatorname {s u m} \left(A ^ {\phi} \odot B B ^ {T} - I\right)}{\operatorname {s u m} \left(A ^ {\phi} - I\right)} \tag {1}
+$$
+
+where ?????? (⋅) represents the summation operation, $\odot$ represents the Hadamard product. $B \in \{ 0 , 1 \} ^ { n \times c }$ represents the one-hot encoding of the pseudo label $R ^ { * }$ , and $I$ represents the identity matrix.
+
+Definition 5 (High-order Combination Graph of Metapaths). Since different orders of the adjacency matrix ?? contain different structural information, high-order graph structures can capture more relationships, defining high-order neighborhood relationships as:
+
+$$
+A _ {k} ^ {\phi} = \frac {1}{k} \sum_ {i = 1} ^ {k} \left(A ^ {\phi}\right) ^ {i} = \frac {1}{k} \left(A ^ {\phi} + \left(A ^ {\phi}\right) ^ {2} + \dots + \left(A ^ {\phi}\right) ^ {k}\right) \tag {2}
+$$
+
+where $k$ represents the order of aggregation of neighborhoods, metapath $\phi \in \phi$ , and $A ^ { \phi }$ represents the high-order neighborhood matrix corresponding to the metapath $\phi$ .
+
+The corresponding metapath high-order combination graph $G _ { C }$ of the heterogeneous network $G$ is defined as:
+
+$$
+G _ {C} = \sum_ {\phi \in \Phi} \theta^ {\phi} A _ {k} ^ {\phi} \tag {3}
+$$
+
+where different metapaths are considered to have different importance. $\theta ^ { \phi }$ is the weight of the subgraph corresponding to the metapath $\phi$ .
+
+Definition 6 (Hierarchical Abstraction Tree). Different from the previous work [34], this paper constructs a heterogeneous abstraction tree $T$ of depth $K$ to represent a metapath high-order combination graph $G _ { C }$ . ?? consists of the set of nodes $V ^ { \prime }$ of the graph $G _ { C }$ , the metapaths $\phi \in \Phi$ , and the relation $E ^ { \prime }$ . Fig. 2 is a simple example.
+
+Definition 7 (K-dimensional Structural Entropy). For a tree $T$ with depth $K$ , this paper defines the structural entropy $H$ of the tree as follows:
+
+$$
+H ^ {K} \left(G _ {C}\right) = \min  _ {\forall T: \text {h e i g h t} (T) = K} \left\{H ^ {T} \left(G _ {C}\right) \right\} \tag {4}
+$$
+
+$$
+H ^ {T} \left(G _ {C}\right) = \sum_ {\alpha \in T, \alpha \neq \text {r o o t}} H ^ {T} \left(G _ {C}; \alpha\right) = - \sum_ {\alpha \in T, \alpha \neq \text {r o o t}} \frac {w (\alpha)}{\mathrm {d} \left(G _ {C}\right)} \log_ {2} \frac {\mathrm {d} \left(T _ {\alpha}\right)}{\mathrm {d} \left(T _ {\alpha} -\right)} \tag {5}
+$$
+
+where $H ^ { T } \left( G _ { C } \right)$ is the structural entropy of the coding tree $T$ corresponding to the graph $G _ { C }$ , the set of edges is sliced according to the non-leaf nodes, and for the non-leaf node and non-root node $\alpha$ , assume that the number of children nodes of $\alpha$ is ?? . $\begin{array} { r } { T _ { \alpha } = \bigcup _ { i = 1 } ^ { N } T _ { \alpha ^ { ( i ) } } , ( } \end{array}$ ??(??) is the ??th children node of $\alpha$ . The root node is denoted as root, $T _ { r o o t } = T$ , the total weights(degrees) of the cut edges inside $T _ { \alpha }$ is $w ( \alpha )$ (edges connecting nodes inside $T _ { \alpha }$ with nodes outside $T _ { \alpha . }$ ), and $d \left( G _ { C } \right)$ is the sum of the degrees of all the nodes in the graph. $\alpha ^ { - }$ represents the parent node of ??. ?? ??  represents the sum of the degrees of all nodes inside $T _ { \alpha }$ .
+
+Problem definition: For a given heterogeneous graph $G$ and target node type ??, our goal is to learn an embedding matrix $\boldsymbol { Z } \in \mathbb { R } ^ { n \times d }$ , with $n$ representing the number of nodes of the target node type $\varepsilon$ and ?? representing the dimension of the embedding that guarantees that the nodes of the target type will be grouped into communities $C =$ $\{ 1 , \ldots , C \}$ with strong connectivity.
+
+# 4. Methods
+
+This section presents a proposal for community detection in heterogeneous graphs (SFCDH). The proposed method disrupts the structural heterophily and enhances the strength of the homophily of the heterogeneous graphs. The main idea of SFCDH is to fuse metapath subgraphs with different homophily ratios and to utilize a dynamic masked autoencoder and contrastive learning for unsupervised community detection in heterogeneous graphs. By fusing metapath level node embeddings and hierarchical tree level node embeddings SFCDH completes unsupervised community detection.
+
+Our model architecture can be seen in Fig. 3. SFCDH consists of two main modules: a hierarchical structure fusion module (SFR) based on homophily ratio sampling and an unsupervised graph representation module (UGC) based on generative and contrastive learning. SFR consists of two parts: (a) Extract homogeneous subgraphs from heterogeneous graphs and compute the homophily ratio for each view to generate high-order fusion graphs. (b) Construct a hierarchical abstraction tree of the high-order fusion graph and learn the node features from the tree perspective. UGC consists of two parts: (c) Apply a masking strategy to compute the contrastive loss based on the community prototype for the high-order fusion graph and the metapath-based homogeneous subgraph. (d) A heterogeneous masked autoencoder is used to calculate the loss before and after reconstructing the features and structures of the augmented graph. By integrating node embeddings from the metapath level and the hierarchical tree level, SFCDH accomplishes unsupervised community detection.
+
+# 4.1. Hierarchical structure fusion module based on homophily ratio sampling
+
+SFR comprises two main components: the high-order rewriting of metapath subgraphs based on homophily ratios and the construction of a hierarchical abstraction tree. By constructing a high-order fusion
+
+![](images/efc3dd4c91f21e06332c25e3cc2b6c1b327900d145fdfaa1a00c253c65d52717.jpg)
+
+![](images/993107c703ee8a0543a0ce3a4d623fa853e3bfe3d2f8ee4f1606a47e074ac707.jpg)  
+(a)   
+(b)   
+（c）  
+Fig. 2. An illustration of a hierarchical abstraction tree for the high-order combination graph based on metapaths. (a) Multiple metapaths are extracted from the heterogeneous network $G$ , and a high-order combination graph is derived based on the metapaths. It consists of Author nodes with different levels of abstraction, where each community can be divided into fine-grained sub-communities (e.g., authors can be grouped into communities according to different research fields, and authors can be divided into communities according to academic institutes). The lowest level of abstraction is individual authors with only their own features, and the highest level is an academic graph. (b) A hierarchical abstraction tree explains and represents an academic graph with a hierarchical structure. (c) The construction of a hierarchical abstraction tree involves two primary operations: INSERT and DELETE. The INSERT operation adds a virtual node between the root and a child node, while the DELETE operation removes a virtual node from the tree. Both operations are designed to optimize the tree’s structure and minimize its entropy.
+
+![](images/29cba3cf78a4135ec49adaef8644d6bdbb0971ffcb60fd5a70d87c71b5e58eb1.jpg)  
+Fig. 3. General framework of SFCDH.
+
+graph based on the homophily ratio, the former improves the ability of SFCDH to generalize metapath subgraphs with different homophily ratios, increases the influence of homophily edges in heterogeneous graphs, and weakens the influence of heterophily edges. The latter learns node embeddings from hierarchical communities by constructing a hierarchical abstraction tree.
+
+4.1.1. High-order rewriting of metapath subgraphs based on homophily ratio
+
+For the metapath-based homogeneous subgraph, this paper first uses metapath2vec [35] as a pre-trained encoder $f \left( \cdot \right)$ to learn the node embedding $Z _ { f }$ , which contains information that is shared by multiple metapaths. We cluster $Z _ { f }$ to extract community information, i.e., $R ^ { \ast } \in$
+
+$\mathbb { R } ^ { n \times c }$ is used as a pseudo label for model initialization, and $c$ is the number of communities.
+
+$$
+Z _ {f} = f \left(\sigma (X; W _ {\theta})\right) \tag {6}
+$$
+
+where $W _ { \theta }$ is the learnable parameter of $f \left( \cdot \right)$ and $\sigma \left( \cdot \right)$ is the corresponding activation function. Since $Z _ { f }$ contains information common to homogeneous subgraphs obtained from multiple metapaths, $Z _ { f }$ is used to guide refined graph structure learning.
+
+$$
+\Omega = Z _ {f} Z _ {f} ^ {T} \tag {7}
+$$
+
+where $\varOmega$ can represent first-order structural similarity.
+
+Since different orders of the adjacency matrix ?? contain different structural information, high-order graph structures can capture more relationships. Thus, Eq. (2) is used to calculate the high-order neighborhood relationship of $A ^ { \phi }$ .
+
+Due to the different homophily ratios of homogeneous subgraphs obtained from different metapaths, high-order aggregation of graph structures with high homophily ratios will be more helpful in discovering similar nodes, and high-order aggregation of graph structures with low homophily ratios will lead to confusion of node embeddings of different classes. Therefore, we design an adaptive aggregation method with high-order aggregation for high homophily ratio graphs and loworder aggregation for low homophily ratio graphs. Since unsupervised community detection cannot use the true labels of the nodes, the pseudo label $R ^ { * }$ is considered here to compute the homophily ratio of each graph, and the homophily ratio is calculated to compute the optimal order for the high-order aggregation of each graph.
+
+$$
+o d ^ {\phi} = \left\{ \begin{array}{c c} 0, & \text {i f} H R ^ {\phi} \leq \delta \\ \left\lfloor \frac {1}{1 - H R ^ {\phi}} \right\rfloor , & \text {i f} H R ^ {\phi} > \delta \end{array} \right. \tag {8}
+$$
+
+where $\lfloor \cdot \rfloor$ is the floor operation and $\delta$ is the coefficient for filtering low homophily graphs. A smaller order is assigned to the low homophily graphs, and for the high homophily graph, a high-order is assigned. Guided by pseudo label, fine-grained learning is performed for each view to obtain a refined graph structure.
+
+$$
+\hat {A} ^ {\phi} = \alpha \theta^ {\phi} A _ {o d \phi} ^ {\phi} + \Omega \tag {9}
+$$
+
+where $\theta ^ { \phi } = \iota ( 1 - \iota ) ^ { \operatorname* { m a x } { \ ( o d ) } - o d ^ { \phi } }$ is the decay factor, which ensures that more consideration is given to graph structures of high homophily, $\iota \in ( 0 , 1 )$ .
+
+Eventually, the graph structures obtained from all metapaths are fused to generate an enhanced high-order fusion graph S, where $\alpha$ and $\beta$ are adjustable parameters.
+
+$$
+S = \sum_ {\phi \in \Phi} \hat {A} ^ {\phi} = \sum_ {\phi \in \Phi} \alpha \theta^ {\phi} A _ {o d \phi} ^ {\phi} + \beta \Omega \tag {10}
+$$
+
+# 4.1.2. Construction of the hierarchical abstraction tree
+
+Coding trees [36] represent a multi-granularity division of the graph into hierarchical communities and sub-communities, providing a better understanding of the structure of the graph. Existing approaches to heterogeneous graphs ignore the hierarchical structure of trees between metapaths. In this section, to better enhance the strength of homophily and uncover various hierarchical structures, the generated high-order fusion graph is constructed as a tree structure, and by minimizing structural entropy, the graph structure instability can be reduced. The tree structure with minimized structural entropy is defined as:
+
+$$
+T ^ {*} = \underset {\forall T: \text {h e i g h t} (T) \leq K} {\arg \min } \left(H ^ {T} (S)\right) \tag {11}
+$$
+
+where height $( T )$ ) represents the height of the semantic tree.
+
+According to algorithm 1, construct a hierarchical abstraction tree based on the fusion graph $S$ . Firstly, a tree is constructed based on the fusion graph $S$ , which contains only leaf nodes and the root node, using all the nodes of $S$ to form the leaf nodes. Lines 2–4 represent constructing a binary tree from the bottom to the top. In this tree,
+
+i.e., INSERT(????????(1), ????????(2)) operation means inserting a new node between the two children of the root node. Lines 5–7 compress the height of the tree until it reaches ??. DELETE(??) operation means deleting the $\alpha$ node and add the children nodes of $\alpha$ to the set of children nodes of the parent of $\alpha$ . Each deleted node should ensure minimum structural entropy after each iteration.
+
+# Algorithm 1 Construction of a Hierarchical Abstraction Tree Based on the High-order Fusion Graph
+
+Input: The height of the tree $k$ , the high-order fusion graph $S$ , the set of nodes ?? ;
+
+Output: Hierarchical abstraction tree of height $k$ ;
+
+1: Construct the hierarchical abstraction tree $T$ containing the root node and leaf nodes, and all nodes inside the set of nodes $V$ are leaf nodes;   
+2: while |????????.??ℎ????????????| $> 2$ do   
+3: INSERT(????????(1), ????????(2)) ← arg max(?? ?? (??) − ?? ??INSERT(????????(1),????????(2)) (??)), ????????(1), $r o o t ^ { ( 2 ) } \in$ ????????.??ℎ????????????;
+
+4: end while
+
+5: while height $( T ) > k$ do   
+6: $\mathrm { D E L E T E } ( \alpha ) \gets \arg \operatorname* { m i n } ( H ^ { T _ { \mathrm { D E L E T E } ( \alpha ) } } ( S ) - H ^ { T } ( S ) ) , \alpha \neq r o o t , \ \alpha \notin \ V ;$   
+7: end while   
+8: return ?? ;
+
+Using the MLP as an encoder $f _ { M } ( \cdot )$ for the abstraction tree, the features of the leaf nodes are initialized using the hierarchical structure of the tree, and the features of the non-leaf nodes are obtained by aggregating the features of their children, i.e., each non-leaf node is an abstraction of its children.
+
+$$
+x _ {v} ^ {i} = f _ {M} ^ {i} \left(\sum_ {u \in v. c h i l d r e n} x _ {u} ^ {(i - 1)}\right) \tag {12}
+$$
+
+where $\boldsymbol { x } _ { v } ^ { i }$ represents the features of node $v$ at the ??th level of the coding tree $T$ , $x _ { v } ^ { 0 }$ is the features of the input leaf nodes, and ??.??ℎ???????????? represents the children of node $v$ . The embedding $Z ^ { T r e e }$ of all nodes inside the high-order fusion graph $S$ is finally obtained from the tree perspective.
+
+Definition 8 (Community Strength). Given an optimal hierarchical abstraction tree $T$ of a graph $S$ , the community strength of a leaf node $v$ in $T$ is defined as:
+
+$$
+o _ {v} = \frac {w (v ^ {-})}{d (S)} - \frac {\left(d \left(T _ {v ^ {-}}\right)\right) ^ {2}}{4 (d (S)) ^ {2}} \tag {13}
+$$
+
+This paper uses community strength to measure the importance score of representing the angle of a leaf node versus a tree. $v ^ { - }$ is the parent of node $v$ . It is composed of two components: the ratios of the weights of the cut edges inside $T _ { v ^ { - } }$ to the degrees of all nodes in the graph $S$ , and the ratios of the sums of the degrees of all nodes in the tree $T _ { v ^ { - } }$ to the sums of degrees in the whole tree. This value can be interpreted as the ratio of edges within a community to which a leaf node belongs and the connections between that community and other communities. Ultimately, the hierarchical abstraction tree angle node is represented as $Z _ { v } ^ { T r e e } = o _ { v } Z _ { v } ^ { T r e e }$ , where $Z _ { v } ^ { T r e e }$ represents the ??th row of $Z ^ { T r e e }$ .
+
+# 4.2. Unsupervised graph representation learning module for joint generative learning and contrastive learning
+
+The UGC module consists of two parts: a community prototype consistency for augmented graphs and a heterogeneous graph masked autoencoder. The former employs a community prototype-based contrastive loss with a constrained dynamic masking strategy to perform augmentation operations on homogeneous subgraphs. At the same time, the latter learns deep node embeddings by reconstructing the graph structure and features.
+
+![](images/97c326aeeff5437512dbe3590023aa5f4a22502ca1ca2fcc3a71bc4313472718.jpg)  
+Fig. 4. Community prototypes consistency.
+
+# 4.2.1. Community prototypes consistency for augmented graphs
+
+Existing graph contrastive learning methods for heterogeneous graphs rarely consider the graph community structure. In this section, we consider combining the dynamic masking strategy with the community structure and use the community-level contrastive loss to guide the model to generate more discriminative masks during the model training process so that nodes in the same community have a similar masking strategy in different augmented graphs. In contrast, nodes in different communities have a different masking strategy, which helps to generate more discriminative node embeddings. For a given heterogeneous graph $G = \left( V , A , T _ { V } , T _ { E } , X , \phi \right) .$ , construct a metapath based adjacency matrix $A ^ { \phi }$ for each metapath $\phi \in \Phi$ . Each $A ^ { \phi }$ generates a binary mask for graph augmentation with the Bernoulli distribution ???? $M _ { A } ^ { \phi } \sim$ Bernoulli $\left( p _ { e } \right)$ , with $p _ { e } < 1$ representing the mask probability. Then, we can obtain two adjacency matrices after augmentation with the masks $\tilde { A } ^ { \phi ^ { 1 } } = M _ { A } ^ { \phi ^ { 1 } } \cdot A ^ { \phi } , \tilde { A } ^ { \bar { \phi } ^ { 2 } } = \bar { M _ { A } ^ { \phi ^ { 2 } } } \cdot A ^ { \phi } .$ . Instead of using a fixed mask probability for attribute reconstruction, the features are dynamically masked. The probability of attribute mask $p _ { a }$ is obtained from the scheduling function $\tau ( m + 1 ) = \tau ( m ) + { \cal { \Delta } }$ , with $\tau \left( m \right)$ representing the proportion of features masked at the ??th epoch.
+
+For $\textit { m } \in \{ 0 , 1 , \ldots , M \}$ , $\tau ( 0 ) ~ = ~ m i n \left( p _ { a } \right)$ and $\tau \left( M \right) \ = \ m a x \left( p _ { a } \right)$ . The binary masks of the features are generated using the Bernoulli distribution $M _ { H } ^ { \phi } \sim$ Bernoulli $\left( p _ { a } \right)$ to obtain the expanded two attribute matrices $\tilde { X } ^ { \phi ^ { 1 } } = M _ { X } ^ { \phi ^ { 1 } } \cdot X ^ { \phi }$ , $\tilde { X } ^ { \phi ^ { 2 } } = M _ { X } ^ { \phi ^ { 2 } } \cdot X ^ { \phi }$ . By applying the augmentation of the above graphs (denoted $t ^ { 1 }$ , $t ^ { 2 } \sim T$ for two independent augmentations, respectively), two view $\left\{ \left( \tilde { X } ^ { \phi ^ { 1 } } , \tilde { A } ^ { \phi ^ { 1 } } \right) = t ^ { 1 } \left( X ^ { \phi } , \stackrel { \cdot } { A } { } ^ { \phi } \right) \right.$ and $\left( \tilde { X } ^ { \phi ^ { 2 } } , \tilde { A } ^ { \phi ^ { 2 } } \right) = t ^ { 2 } \left( X ^ { \phi } , A ^ { \phi } \right)$ can be generated for each metapath $\phi \in \Phi$ .
+
+The community prototype matrix Υ is obtained by random initialization of the model at the beginning. Then, it is averaged from the embeddings of all the nodes of that community during subsequent training:
+
+$$
+Y _ {k} = \sum_ {k _ {i} = k} \widetilde {x} _ {i} / \sum_ {k _ {i} = k} 1 \tag {14}
+$$
+
+where $Y _ { k }$ is the ??th line of $\Upsilon$ , represents the ??th community prototype embedding. $\widetilde { \boldsymbol { x } } _ { i }$ represents the ??th line of $\widetilde { X }$ , and $k \in [ 1 , c ]$ represents the number of communities. $k _ { i }$ represents the community to which the ??th node belongs.
+
+A cross-view and cross-community contrastive mechanism compares the node embedding of one view with the community prototypes of the other view. As is shown in Fig. 4, the community contrastive loss is:
+
+$$
+l _ {\cos} (\widetilde {X}, Y) = - (1 - \exp \frac {- m}{\epsilon}) \times \log \sum_ {i} \frac {\delta (\widetilde {x} _ {i} , Y _ {k _ {i}})}{\delta (\widetilde {x} _ {i} , Y _ {k _ {i}}) + \sum_ {k _ {i} \neq k} w (i , k) \cdot \delta (\widetilde {x} _ {i} , Y _ {k})}
+$$
+
+(15)
+
+where $m$ refers to the current training epoch, $\epsilon$ is the hyperparameter, and the weight of contrastive loss increases gradually during the model training process. ?? represents Gaussian RBF similarity. $w \left( i , k \right)$ is the RBF weight function. $w \left( i , k \right) = \exp \left\{ - \gamma \| \widetilde { x } _ { i } - Y _ { k } \| ^ { 2 } \right\}$ . This maximizes the similarity of nodes in the same community and minimizes the similarity of nodes in different communities. As a result, the contrastive loss of the final model is:
+
+$$
+L _ {\mathrm {C o s}} = \frac {1}{2} \sum_ {\phi \in \phi \cup S} \left[ l _ {\cos} \left(\tilde {X} ^ {\phi^ {1}}, Y ^ {\phi^ {2}}\right) + l _ {\cos} \left(\tilde {X} ^ {\phi^ {2}}, Y ^ {\phi^ {1}}\right) \right] \tag {16}
+$$
+
+where $\tilde { X } ^ { \phi ^ { 1 } }$ represents the attribute matrix of the first view of the homogeneous subgraph corresponding to the metapath $\phi$ after graph augmentation, and $\gamma \bar { \phi } ^ { 2 }$ represents the matrix of community prototypes in the second view after graph augmentation.
+
+# 4.2.2. Heterogeneous graph masked autoencoder
+
+To capture the complex semantic information inside the heterogeneous graph, we mask the homogeneous subgraph $G _ { \phi } ~ = ~ \left( V ^ { \prime } , E ^ { \prime } \right)$ obtained from the metapaths and the high-order fusion graph $S$ , which destroys the short-range semantic connectivity, aiding the model in exploring deeper relationships to predict the masked information, and facilitating more effective learning of semantic information. To mine the content information contained in the node features, a dynamic masking strategy is used for the features of the nodes. This allows the model to gradually enhance the learning of the target type of node features during the training process.
+
+The learned node features are obtained by feeding the attribute matrix $X$ and the masked adjacency matrix $\widetilde { A } ^ { \phi }$ into the encoder $f _ { E } \left( \cdot \right)$ .
+
+$$
+H _ {1} ^ {\phi} = f _ {E} \left(\widetilde {A} ^ {\phi}, X\right) \tag {17}
+$$
+
+Then use the decoder $f _ { D } \left( \cdot \right)$ to generate the node embedding $H _ { 2 } ^ { \phi }$ , use the sigmoid activation function to get the reconstructed adjacency matrix $A ^ { \phi ^ { \prime } }$ , and compute the reconstruction loss between the reconstructed adjacency matrix and the original adjacency matrix $A ^ { \phi }$ .
+
+$$
+H _ {2} ^ {\phi} = f _ {D} \left(\widetilde {A} ^ {\phi}, H _ {1} ^ {\phi}\right), A ^ {\phi^ {\prime}} = \sigma \left(\left(H _ {2} ^ {\phi}\right) ^ {T} \cdot H _ {2} ^ {\phi}\right) \tag {18}
+$$
+
+$$
+l ^ {\phi} = \frac {1}{\left| A ^ {\phi} \right|} \sum_ {v \in V} \left(1 - \frac {A _ {v} ^ {\phi} \cdot A _ {v} ^ {\phi^ {\prime}}}{\left\| A _ {v} ^ {\phi} \right\| \times \left\| A _ {v} ^ {\phi^ {\prime}} \right\|}\right) ^ {\gamma_ {1}} \tag {19}
+$$
+
+where $l ^ { \phi }$ represents the edge reconstruction loss of the metapath $\phi$ , and $\gamma _ { 1 }$ is the corresponding scale factor. Since the importance of each metapath is different, the semantic level attention mechanism is introduced here to calculate the importance scores $c ^ { \phi }$ of different metapaths. Different metapath weights are obtained by normalizing $c ^ { \phi }$ using the softmax function.
+
+$$
+c ^ {\phi} = q ^ {\mathrm {T}} \cdot \tanh  \left(W \cdot H _ {1} ^ {\phi} + b\right), \alpha^ {\phi} = \frac {\exp \left(c ^ {\phi}\right)}{\sum_ {\phi \in \Phi \cup S} \exp \left(c ^ {\phi}\right)} \tag {20}
+$$
+
+where ?? represents the weight matrix and $b$ is the bias vector. The final edge reconstruction loss $L _ { \mathrm { E d g e } }$ for all metapaths is calculated as follows:
+
+$$
+L _ {\text {E d g e}} = \sum_ {\phi \in \Phi \cup S} \alpha^ {\phi} \cdot l ^ {\phi} \tag {21}
+$$
+
+∈ ∪ The attribute matrix $\widetilde { X }$ after masking and the original adjacency matrix $A$ are fed into the encoder to compute the learned node attribute $H _ { 3 }$ :
+
+$$
+Z = f _ {E} (A, \widetilde {X}), H _ {3} = f _ {D} (A, Z) \tag {22}
+$$
+
+Use the decoder to get the reconstructed node features $H _ { 3 }$ and calculate the attribute reconstruction loss.
+
+$$
+L _ {\text {F e a t}} = \frac {1}{| \widetilde {V} |} \sum_ {v \in \widetilde {V}} \left(1 - \frac {\tilde {X} _ {v} \cdot H _ {3 v}}{\| \tilde {X} _ {v} \| \times \| H _ {3 v} \|}\right) ^ {\gamma_ {2}} \tag {23}
+$$
+
+where $\widetilde { V }$ denotes the set of masked target nodes, and $\gamma _ { 2 }$ is the corresponding scale factor.
+
+# 4.3. Model optimization
+
+Ultimately, the final objective function $L$ is defined as a weighted combination of multi-view contrastive loss $L _ { \mathrm { C o s } }$ , metapath-based edge reconstruction loss $L _ { \mathrm { E d g e } }$ , and attribute reconstruction loss $L _ { \mathrm { F e a t } }$ formed.
+
+$$
+L = \lambda \cdot L _ {\text {C o s}} + \mu \cdot L _ {\text {E d g e}} + \eta \cdot L _ {\text {F e a t}} \tag {24}
+$$
+
+The specific optimization algorithm is shown in algorithm 2.
+
+# Algorithm 2 SFCDH
+
+Input: All homogeneous subgraphs based on metapaths $G _ { \phi } = \left( V ^ { \prime } , E ^ { \prime } \right)$ , $\phi \in \phi$ , target node attribute $X$ , pre-trained pseudo label $R ^ { 0 }$ , pseudo label update interval ????????????;
+
+Output: Community assignment matrix of nodes $R ^ { * }$
+
+1: $R = R ^ { 0 }$ ;   
+2: for ?????? $\cdot h = 1 , 2 , \ldots$ do   
+3: if ????????ℎ% ???????????? $= 0$ then   
+4: Update $R = R ^ { * }$   
+5: Update the high-order fusion graph $S$ according to $R$ and Eq. (10);   
+6: Update the latest tree of $S$ according to Algorithm 1;   
+7: end if   
+8: for each $G _ { \phi } = \left( V ^ { \prime } , E ^ { \prime } \right)$ , $\phi \in \phi \cup S$ do   
+9: Generate two augmented graphs $\left( \tilde { X } ^ { \phi ^ { 1 } } , \tilde { A } ^ { \phi ^ { 1 } } \right)$ and $\biggl ( \tilde { X } ^ { \phi ^ { 2 } } , \tilde { A } ^ { \phi ^ { 2 } } \biggr ) ;$ ;   
+10: Calculate the contrastive loss $L _ { \mathrm { C o s } }$ according to Eq. (16);   
+11: end for   
+12: for each $G _ { \phi } = \left( V ^ { \prime } , E ^ { \prime } \right)$ , $\phi \in \phi \cup S$ do   
+13: Generate the node embedding $Z$ according to $f _ { E } \left( \cdot \right)$ and Eq. (22);   
+14: Compute the reconstruction loss of decoded features and edges $L _ { \mathrm { F e a t } }$ , $L _ { \mathrm { E d g e } }$ according to Eq. (19)-(23);   
+15: end for   
+16: Generate the node embedding $Z ^ { T r e e }$ of the tree according to (12);   
+17: Concatenate $Z$ and $Z ^ { T r e e }$   
+18: Use K-means to obtain the community assignment matrix $R ^ { * }$   
+19: end for   
+20: return $R ^ { * }$
+
+The node embedding $Z$ learned from the heterogeneous graph autoencoder and the node embedding $Z ^ { T r e e }$ learned from the hierarchical abstraction tree perspective are concatenated, achieving multilevel structure fusion. The epoch-based community assignment matrix $R ^ { * }$ is obtained using the K-means algorithm, which is used as a pseudo label for generating a high-order fusion graph during the model training process until the model reaches optimality.
+
+# 5. Experimental evaluation
+
+# 5.1. Experiment settings
+
+# 5.1.1. Datasets
+
+To verify the performance of SFCDH, this paper conducts experiments using 6 publicly available heterogeneous graph datasets: ACM, DBLP, Freebase, IMDB, AMiner and Texas. Table 2 describes the 6 heterogeneous graph datasets. Edges are the number of edges corresponding to homogeneous subgraphs extracted by the corresponding metapaths, the fifth column represents the corresponding number of homophily edges inside the subgraphs extracted through each metapath, and the ???? in the sixth column represents the homophily ratio.
+
+According to the homophily ratio, ACM, DBLP, Freebase and AMiner are typical homophilous heterogeneous graphs while IMDB and Texas are typical heterophilous heterogeneous graphs.
+
+(1) ACM. A common citation graph dataset with three types of nodes: author, paper, and subject.   
+(2) DBLP. A common citation graph dataset with four types of nodes: author, paper, term, and conference.   
+(3) Freebase. A common large movie graph dataset with four types of nodes: movie, actor, direct and writer.   
+(4) IMDB. An online movie graph dataset with four types of nodes: movie, actor, direct and keyword.   
+(5) AMiner. An online citation graph dataset with three types of nodes: paper, author and reference. The target nodes consist of papers categorized into four classes, based on a subset of the original dataset.   
+(6) Texas. To test the performance of SFCDH on heterophily graphs, datasets such as Texas and IMDB are utilized. Texas is a webpage graph from the WebKB3 dataset with a homophily ratio (HR) of 0.06.
+
+# 5.1.2. Baselines
+
+This study compares the proposed SFCDH model with 11 baselines, categorized into three types: homogeneous network community detection methods(DFCN, VGAER, DDGAE), heterogeneous network community detection methods(HAN, HeCo, HetGNN-SF, HGMAE, HAESF), and heterophilous network community detection methods(HoLe, AHGFC, PLCSR). A brief description of these compared models is given below.
+
+HAN [21] incorporates a node-level attention mechanism to discern the significance of nodes and various types of neighbors, along with a semantic-level attention mechanism to evaluate the relevance of different metapaths, ultimately utilizing the node embeddings for community detection.
+
+DFCN [37] employs a dynamic fusion module to merge embeddings acquired from both local and global perspectives, integrating a triple self-supervision mechanism for enhanced community detection.
+
+HeCo [38] performs direct cross-view contrastive learning across network schema and metapath views, enabling mutual supervision between views to learn robust node embeddings.
+
+VGAER [39] employs a variational graph autoencoder for community detection, integrating high-order modularity information with node features.
+
+HetGNN-SF [40] utilizes a weighted fusion approach to construct a semantic fusion graph, deriving final node embeddings from both semantic strength and feature similarity, combined with contrastive learning.
+
+HGMAE [6] leverages a dynamic masked autoencoder to learn node embeddings by encoding attribute, topology, and location information, facilitating effective community detection.
+
+HoLe [41] employs hierarchical correlation estimation and clusteraware sparsity modules to enhance graph homophily, effectively integrating community detection with graph structure learning.
+
+DDGAE [42] constructs views leveraging high-order modularity and attribute information, employing a deep multiple-attention mechanism for community detection through topology and feature reconstruction.
+
+HAESF [5] employs a graph autoencoder to aggregate heterogeneous graph structure information and utilizes non-negative matrix decomposition to learn community semantic information, optimizing both components jointly.
+
+AHGFC [33] enhances node embeddings by considering both low and high frequency signals based on graph homophily. A graph joint aggregation matrix is designed using node features and adjacency relationships to make these signals more distinguishable.
+
+PLCSR [43] utilizes an EMA-based self-auxiliary encoder and dynamic threshold-driven curriculum selection to boost pseudo-label reliability for precise node processing in graph-based learning models for community detection.
+
+Table 2 Statistics of datasets.   
+
+<table><tr><td>Dataset</td><td>Node</td><td>Metapath</td><td>Edges</td><td>Homo-Edges</td><td>HR</td></tr><tr><td rowspan="3">ACM</td><td>paper(P):4019</td><td>PAP</td><td>53834</td><td>43526</td><td>0.8085</td></tr><tr><td>author(A):7167</td><td>PSP</td><td>4334194</td><td>2770816</td><td>0.6393</td></tr><tr><td>subject(S):60</td><td></td><td></td><td></td><td></td></tr><tr><td rowspan="4">DBLP</td><td>author(A):4057</td><td>APA</td><td>7056</td><td>5636</td><td>0.7988</td></tr><tr><td>paper(P):14328</td><td>APCPA</td><td>4996438</td><td>3346042</td><td>0.6697</td></tr><tr><td>conference(C):20</td><td>APTPA</td><td>7039514</td><td>2284306</td><td>0.3245</td></tr><tr><td>term(T):7723</td><td></td><td></td><td></td><td></td></tr><tr><td rowspan="4">Freebase</td><td>movie(M):3492</td><td>MDM</td><td>4912</td><td>4078</td><td>0.8302</td></tr><tr><td>actor(A):33401</td><td>MAM</td><td>251210</td><td>173820</td><td>0.6919</td></tr><tr><td>direct(D):2502</td><td>MWM</td><td>7214</td><td>4638</td><td>0.6429</td></tr><tr><td>writer(W):4459</td><td></td><td></td><td></td><td></td></tr><tr><td rowspan="4">IMDB</td><td>movie(M):4275</td><td>MAM</td><td>98010</td><td>49538</td><td>0.5054</td></tr><tr><td>actor(A):5432</td><td>MDM</td><td>21018</td><td>14802</td><td>0.7043</td></tr><tr><td>director(D):2083</td><td>MKM</td><td>813852</td><td>328700</td><td>0.4039</td></tr><tr><td>keyword(K):7313</td><td></td><td></td><td></td><td></td></tr><tr><td rowspan="3">AMiner</td><td>paper(P):6564</td><td>PAP</td><td>15412</td><td>14788</td><td>0.9595</td></tr><tr><td>author(A):13319</td><td>PRP</td><td>123260</td><td>106124</td><td>0.8609</td></tr><tr><td>reference(R):35890</td><td></td><td></td><td></td><td></td></tr><tr><td>Texas</td><td>187</td><td>-</td><td>1703</td><td>104</td><td>0.0611</td></tr></table>
+
+Table 3 Comparison of DBLP.   
+
+<table><tr><td></td><td>NMI</td><td>ARI</td><td>ACC</td><td>F1</td><td>Precision</td><td>Recall</td></tr><tr><td>HAN</td><td>0.6115</td><td>0.6209</td><td>0.7894</td><td>0.7343</td><td>0.7707</td><td>0.7454</td></tr><tr><td>DFCN</td><td>0.6471</td><td>0.6867</td><td>0.8553</td><td>0.8436</td><td>0.6867</td><td>0.8436</td></tr><tr><td>HeCo</td><td>0.7113</td><td>0.7675</td><td>0.8989</td><td>0.8896</td><td>0.8950</td><td>0.8866</td></tr><tr><td>VGAER</td><td>0.7149</td><td>0.7392</td><td>0.8699</td><td>0.8291</td><td>0.8638</td><td>0.8444</td></tr><tr><td>HetGNN-SF</td><td>0.6146</td><td>0.6436</td><td>0.8441</td><td>0.8393</td><td>0.8510</td><td>0.8464</td></tr><tr><td>HGMAE</td><td>0.7203</td><td>0.7691</td><td>0.9004</td><td>0.8923</td><td>0.8980</td><td>0.8904</td></tr><tr><td>HoLe</td><td>0.4101</td><td>0.4376</td><td>0.7422</td><td>0.7386</td><td>0.7491</td><td>0.7496</td></tr><tr><td>DDGAE</td><td>0.6333</td><td>0.6579</td><td>0.8338</td><td>0.8155</td><td>0.8270</td><td>0.8155</td></tr><tr><td>HAESF</td><td>0.7244</td><td>0.7679</td><td>0.9014</td><td>0.8919</td><td>0.9105</td><td>0.8840</td></tr><tr><td>AHGFC</td><td>0.5762</td><td>0.5314</td><td>0.7352</td><td>0.6406</td><td>0.7352</td><td>0.7352</td></tr><tr><td>PLCSR</td><td>0.3731</td><td>0.2945</td><td>0.5943</td><td>0.6070</td><td>0.6679</td><td>0.5845</td></tr><tr><td>SFCDH</td><td>0.7613</td><td>0.8133</td><td>0.9216</td><td>0.9157</td><td>0.9195</td><td>0.9134</td></tr></table>
+
+# 5.1.3. Parameter settings
+
+This section is written to implement the proposed SFCDH model based on pytorch. The model parameters are generated by random initialization, the encoder and decoder are HAN, the learning rate ranges from 8e-6 to 3e-4, and the Adam optimizer is used for training. The early stopping patience ranges from 10 to 50. The model hyperparameters are tuned according to experiments on different datasets. All experiments are conducted on an RTX 4090 GPU.
+
+For baselines, the parameters follow the original paper settings by default. In the final learned node embedding, community detection is performed using the K-means algorithm, taking the mean of the results of 10 runs with different random seeds.
+
+# 5.2. Performance analysis
+
+Before community detection, we convert heterogeneous graph datasets into homogeneous graphs using metapaths for baselines based on homogeneous graphs. Tables 3–8 present the impact of community detection on 6 datasets for both the baselines and the proposed model. Table 3 compares results on the DBLP dataset, showing that the NMI score of SFCDH surpasses those of HAN, DFCN, HeCo, VGAER, HetGNN-SF, HGMAE, HoLe, DDGAE, HAESF, AHGFC, and PLCSR by $1 4 . 9 8 \%$ , $1 1 . 4 2 \%$ , $5 \%$ , $4 . 6 4 \%$ , $1 4 . 6 7 \%$ , $4 . 1 \%$ , $3 5 . 1 2 \%$ , $1 2 . 8 \%$ , $3 . 6 9 \%$ , $1 8 . 5 1 \%$ , and $3 9 \%$ , respectively. This demonstrates that the proposed method significantly outperforms recent community detection techniques for heterogeneous graphs, such as HGMAE, HetGNN-SF, and HAESF, as well as homogeneous graph detection methods like DDGAE and DFCN, and heterophilous graph detection methods, including HoLe, AHGFC, and PLCSR.
+
+Table 4 Comparison of ACM.   
+
+<table><tr><td></td><td>NMI</td><td>ARI</td><td>ACC</td><td>F1</td><td>Precision</td><td>Recall</td></tr><tr><td>HAN</td><td>0.4618</td><td>0.4589</td><td>0.5695</td><td>0.4537</td><td>0.4931</td><td>0.4361</td></tr><tr><td>DFCN</td><td>0.3708</td><td>0.2999</td><td>0.6477</td><td>0.6627</td><td>0.2999</td><td>0.6617</td></tr><tr><td>HeCo</td><td>0.5574</td><td>0.4988</td><td>0.8014</td><td>0.8162</td><td>0.8261</td><td>0.8507</td></tr><tr><td>VGAER</td><td>0.3775</td><td>0.3021</td><td>0.6477</td><td>0.6627</td><td>0.6841</td><td>0.6511</td></tr><tr><td>HetGNN-SF</td><td>0.5091</td><td>0.4403</td><td>0.7024</td><td>0.5948</td><td>0.6287</td><td>0.6389</td></tr><tr><td>HGMAE</td><td>0.5652</td><td>0.5231</td><td>0.7932</td><td>0.7488</td><td>0.8613</td><td>0.7443</td></tr><tr><td>HoLe</td><td>0.5639</td><td>0.5429</td><td>0.8313</td><td>0.8348</td><td>0.8281</td><td>0.8755</td></tr><tr><td>DDGAE</td><td>0.4022</td><td>0.3745</td><td>0.6857</td><td>0.6391</td><td>0.6475</td><td>0.6631</td></tr><tr><td>HAESF</td><td>0.5681</td><td>0.5542</td><td>0.8323</td><td>0.8418</td><td>0.8419</td><td>0.8644</td></tr><tr><td>AHGFC</td><td>0.4208</td><td>0.4078</td><td>0.7282</td><td>0.7333</td><td>0.7466</td><td>0.7286</td></tr><tr><td>PLCSR</td><td>0.4429</td><td>0.3934</td><td>0.6783</td><td>0.5980</td><td>0.6184</td><td>0.6265</td></tr><tr><td>SFCDH</td><td>0.6300</td><td>0.6474</td><td>0.8729</td><td>0.8783</td><td>0.8725</td><td>0.8919</td></tr></table>
+
+Table 5 Comparison of Freebase.   
+
+<table><tr><td></td><td>NMI</td><td>ARI</td><td>ACC</td><td>F1</td><td>Precision</td><td>Recall</td></tr><tr><td>HAN</td><td>0.1211</td><td>0.1386</td><td>0.5286</td><td>0.4794</td><td>0.4808</td><td>0.4802</td></tr><tr><td>DFCN</td><td>0.0803</td><td>0.0387</td><td>0.4505</td><td>0.3958</td><td>0.5278</td><td>0.4191</td></tr><tr><td>HeCo</td><td>0.1748</td><td>0.1986</td><td>0.5646</td><td>0.5068</td><td>0.5059</td><td>0.5108</td></tr><tr><td>VGAER</td><td>0.1647</td><td>0.0793</td><td>0.5493</td><td>0.5493</td><td>0.4671</td><td>0.4296</td></tr><tr><td>HetGNN-SF</td><td>0.1886</td><td>0.2111</td><td>0.5713</td><td>0.5172</td><td>0.5186</td><td>0.5171</td></tr><tr><td>HGMAE</td><td>0.1784</td><td>0.1960</td><td>0.5822</td><td>0.5048</td><td>0.5176</td><td>0.5002</td></tr><tr><td>HoLe</td><td>0.0405</td><td>0.0074</td><td>0.3771</td><td>0.3520</td><td>0.4163</td><td>0.4240</td></tr><tr><td>DDGAE</td><td>0.1643</td><td>0.1621</td><td>0.5404</td><td>0.4557</td><td>0.4840</td><td>0.4565</td></tr><tr><td>HAESF</td><td>0.0791</td><td>0.0990</td><td>0.5000</td><td>0.4578</td><td>0.4679</td><td>0.4703</td></tr><tr><td>AHGFC</td><td>0.1728</td><td>0.1721</td><td>0.5565</td><td>0.5132</td><td>0.5305</td><td>0.5087</td></tr><tr><td>PLCSR</td><td>0.2032</td><td>0.1544</td><td>0.5684</td><td>0.4469</td><td>0.5173</td><td>0.4585</td></tr><tr><td>SFCDH</td><td>0.2100</td><td>0.1923</td><td>0.6412</td><td>0.4716</td><td>0.7918</td><td>0.5133</td></tr></table>
+
+Table 5 compares results on the Freebase dataset, showing that SFCDH achieves the highest scores in NMI, ACC, and Precision. While it ranks second to HetGNN-SF and VGAER in the other metrics, the performance of SFCDH remains highly competitive.
+
+Table 6 - Table 8 presents the experimental results on the IMDB and Texas dataset, characterized by heterophily in heterogeneous graphs. Due to the lack of positive and negative sample information of IMDB and Texas, HeCo cannot be used as a baseline. The remaining 10 baselines yield poor results. The heterophilous nature of the IMDB dataset prevents effective analysis of the homogeneous subgraphs extracted from the metapaths, leading to suboptimal outcomes. However, SFCDH outperforms the second-place model by $1 1 \%$ in accuracy. These results indicate that the proposed model performs well on both heterophilous and homophilous heterogeneous graphs.
+
+Table 6 Comparison of IMDB.   
+
+<table><tr><td></td><td>NMI</td><td>ARI</td><td>ACC</td><td>F1</td><td>Precision</td><td>Recall</td></tr><tr><td>HAN</td><td>0.0166</td><td>0.0172</td><td>0.1806</td><td>0.1010</td><td>0.2910</td><td>0.2290</td></tr><tr><td>DFCN</td><td>0.0233</td><td>-0.002</td><td>0.2805</td><td>0.1628</td><td>0.2947</td><td>0.2549</td></tr><tr><td>VGAER</td><td>0.0168</td><td>0.0053</td><td>0.3673</td><td>0.2061</td><td>0.3853</td><td>0.3475</td></tr><tr><td>HetGNN-SF</td><td>0.0100</td><td>0.0037</td><td>0.3968</td><td>0.2839</td><td>0.3228</td><td>0.3573</td></tr><tr><td>HGMAE</td><td>0.0353</td><td>0.0392</td><td>0.4451</td><td>0.3450</td><td>0.3664</td><td>0.3559</td></tr><tr><td>HoLe</td><td>0.0350</td><td>0.0007</td><td>0.3633</td><td>0.2987</td><td>0.3549</td><td>0.3361</td></tr><tr><td>DDGAE</td><td>0.0847</td><td>0.0884</td><td>0.4769</td><td>0.4413</td><td>0.4752</td><td>0.4892</td></tr><tr><td>HAESF</td><td>0.0152</td><td>0.0115</td><td>0.3818</td><td>0.3810</td><td>0.3947</td><td>0.3989</td></tr><tr><td>AHGFC</td><td>0.0516</td><td>0.0570</td><td>0.4509</td><td>0.4383</td><td>0.4430</td><td>0.4379</td></tr><tr><td>PLCSR</td><td>0.0437</td><td>0.0356</td><td>0.3973</td><td>0.4014</td><td>0.4431</td><td>0.4071</td></tr><tr><td>SFCDH</td><td>0.1641</td><td>0.1953</td><td>0.5869</td><td>0.4671</td><td>0.6033</td><td>0.5433</td></tr></table>
+
+Table 7 Comparison of AMiner.   
+
+<table><tr><td></td><td>NMI</td><td>ARI</td><td>ACC</td><td>F1</td><td>Precision</td><td>Recall</td></tr><tr><td>HAN</td><td>0.2025</td><td>0.0531</td><td>0.3882</td><td>0.3882</td><td>0.3992</td><td>0.3491</td></tr><tr><td>DFCN</td><td>0.3645</td><td>0.2978</td><td>0.5474</td><td>0.5604</td><td>0.5780</td><td>0.5508</td></tr><tr><td>HeCo</td><td>0.3141</td><td>0.3111</td><td>0.5831</td><td>0.5075</td><td>0.5870</td><td>0.5260</td></tr><tr><td>VGAER</td><td>0.2458</td><td>0.1099</td><td>0.4141</td><td>0.4141</td><td>0.4233</td><td>0.3493</td></tr><tr><td>HetGNN-SF</td><td>0.1302</td><td>0.1380</td><td>0.5967</td><td>0.3830</td><td>0.4317</td><td>0.3993</td></tr><tr><td>HGMAE</td><td>0.3798</td><td>0.3224</td><td>0.6173</td><td>0.5212</td><td>0.6179</td><td>0.5210</td></tr><tr><td>HoLe</td><td>0.3133</td><td>0.2519</td><td>0.5508</td><td>0.3827</td><td>0.4018</td><td>0.3708</td></tr><tr><td>DDGAE</td><td>0.2361</td><td>0.2396</td><td>0.5501</td><td>0.4837</td><td>0.5098</td><td>0.5149</td></tr><tr><td>HAESF</td><td>0.0242</td><td>0.0121</td><td>0.3271</td><td>0.2524</td><td>0.2633</td><td>0.2694</td></tr><tr><td>AHGFC</td><td>0.2596</td><td>0.2102</td><td>0.5718</td><td>0.5032</td><td>0.5971</td><td>0.4845</td></tr><tr><td>PLCSR</td><td>0.3135</td><td>0.3526</td><td>0.5689</td><td>0.4322</td><td>0.4395</td><td>0.4310</td></tr><tr><td>SFCDH</td><td>0.4032</td><td>0.5154</td><td>0.6900</td><td>0.5860</td><td>0.7068</td><td>0.5935</td></tr></table>
+
+Table 8 Comparison of Texas.   
+
+<table><tr><td></td><td>NMI</td><td>ARI</td><td>ACC</td><td>F1</td><td>Precision</td><td>Recall</td></tr><tr><td>HAN</td><td>0.0664</td><td>0.1221</td><td>0.4278</td><td>0.2226</td><td>0.2449</td><td>0.2357</td></tr><tr><td>DFCN</td><td>0.0530</td><td>0.0959</td><td>0.4412</td><td>0.1310</td><td>0.1902</td><td>0.1835</td></tr><tr><td>VGAER</td><td>0.0534</td><td>0.0522</td><td>0.3663</td><td>0.3263</td><td>0.2565</td><td>0.2555</td></tr><tr><td>HetGNN-SF</td><td>0.0857</td><td>0.1589</td><td>0.4439</td><td>0.2348</td><td>0.2449</td><td>0.2357</td></tr><tr><td>HGMAE</td><td>0.1251</td><td>0.1174</td><td>0.4396</td><td>0.1640</td><td>0.1993</td><td>0.1748</td></tr><tr><td>HoLe</td><td>0.1376</td><td>0.2175</td><td>0.5782</td><td>0.2271</td><td>0.3026</td><td>0.2096</td></tr><tr><td>DDGAE</td><td>0.0573</td><td>-0.009</td><td>0.3262</td><td>0.1903</td><td>0.1784</td><td>0.2136</td></tr><tr><td>HAESF</td><td>0.1144</td><td>0.1411</td><td>0.5187</td><td>0.2165</td><td>0.3771</td><td>0.3023</td></tr><tr><td>AHGFC</td><td>0.1475</td><td>0.0678</td><td>0.3387</td><td>0.2615</td><td>0.2948</td><td>0.2529</td></tr><tr><td>PLCSR</td><td>0.1281</td><td>0.2104</td><td>0.5342</td><td>0.1274</td><td>0.2957</td><td>0.1843</td></tr><tr><td>SFCDH</td><td>0.1510</td><td>0.2467</td><td>0.5882</td><td>0.3322</td><td>0.4207</td><td>0.3049</td></tr></table>
+
+# 5.3. Ablation study
+
+Since the model in this paper consists of multiple modules, this subsection analyzes the contribution of different modules to the model by removing each module independently. SFCDH-C, SFCDH-G, and SFCDH-T represent the removal of the graph contrastive mechanism based on community prototypes, the removal of the high-order fusion graph, and the removal of the hierarchical abstraction tree, respectively. Fig. 5 shows experimental results on ACM and DBLP datasets. Particularly, the removal of the high-order fusion graph has the greatest effect on the detection of communities. The removal of the community prototypes comparison mechanism and the hierarchical abstraction tree also result in a decrease in model performance, indicating their effectiveness in enhancing model performance. Integrating all modules yields the most effective results.
+
+# 5.4. Parameters analysis
+
+In this section, sensitivity experiments are conducted on ACM, DBLP, and IMDB datasets for the 5 main parameters.
+
+Analysis of the balance coefficients of the loss function. To assess the robustness of the model, the balance coefficients of the loss functions are first adjusted. The balance coefficients determine the
+
+weight of the three loss functions during training. The coefficient ?? ranges from 1 to 10, with an adjustment interval of 1. Fig. 6 shows the experimental results on the ACM dataset. It can be found that when ?? $= 2$ , the model reaches the best result. When the NMI is in the range of 1–10, the model performance shows a trend of rising, then falling, and then rising, without significant overall decline. During this range, the NMI fluctuates between 0.58 and 0.63, outperforming the baseline. The graph indicates that the performance of SFCDH remains relatively stable, demonstrating the robustness and confirming the effectiveness of the loss function $L _ { \mathrm { C o s } }$ . In general, the effectiveness of the model decreases slightly as the coefficient $\mu$ increases, with an overall fluctuation of around $2 \%$ . As the coefficient increases, the parameter $\eta$ has an overall upward trend in model performance, indicating that the SFCDH performs better with a higher attribute reconstruction loss.
+
+Hidden dimension analysis. To evaluate the impact of different hidden dimensions on model performance. As shown in Fig. 7, different hidden dimensions affect model performance for DBLP and IMDB datasets. We define the hidden layer dimensions as 64, 128, 256, 512, 1024. We can find that using too small hidden layer dimensions results in the model failing to capture comprehensive information, and hidden layer dimensions that are too large distract the attention of the model from the valid information, so both too small and too large hidden layer dimensions result in reduced model performance. However, a moderate hidden layer dimension is sufficient for the model to perform optimally.
+
+Height analysis of the hierarchical abstraction tree. On the DBLP and IMDB datasets, we continuously adjusted the height of the hierarchical abstraction tree to examine its impact on model performance. According to Fig. 8, the DBLP and IMDB datasets achieve optimal performance at tree heights of 3 and 5, respectively. When the tree heights are either too large or too small, model performance declines. Excessive tree height can lead to information loss or blurring as data passes through each layer, causing confusion between node embeddings of different communities. Conversely, if the tree height is too low, it fails to capture the hierarchical community information of the graph and cannot learn fine-grained node embeddings.
+
+The impact of the network layer analysis. In order to investigate the influence of network layer depth on model efficacy, we conducted a systematic examination by varying the number of network layers within the range of 2 to 6 on the IMDB dataset. Our analysis reveals that as the number of network layers is adjusted incrementally, the performance metrics including ACC, NMI, ARI, and F1 score exhibit minimal fluctuations. Notably, the model demonstrates a trend towards stability, indicating a robustness to changes in the number of network layers. The findings suggest that the model displays a consistent performance across different network layer configurations, showcasing a limited sensitivity to variations in layer depth. This stability underscores the model’s resilience to alterations in this parameter, emphasizing its reliability in diverse settings (see Fig. 9).
+
+Impact of the dynamic masking strategy. We implemented a dynamic mask rate within the module designed for the consistency of community prototypes in augmented graphs. To assess its effectiveness, we conducted a comprehensive analysis comparing the performance of the dynamic mask rate $p$ with fixed mask rates, as depicted in Fig. 10. Our evaluation centered on variations in NMI, ARI, and ACC while employing fixed mask rates ranging from 0.4 to 0.8 alongside the dynamic mask $p$ . The results demonstrate that the dynamic mask consistently outperforms the fixed mask rates. Additionally, we observed that as the mask rate increases, performance generally improves, indicating that an optimal mask rate contributes to enhanced model effectiveness. Moreover, the dynamic masking mechanism allows the model to learn efficiently without the need for manual adjustment of the mask rate.
+
+# 5.5. Illustrating community interpretability.
+
+In order to demonstrate the interpretability of the acquired communities, we visualize the global representation matrix of these communities through a heatmap. Fig. 11 exhibits the feature distribution of the
+
+![](images/d36e5d3038e1ad5ac50ac5df09fdbf90d5031182a3f25ffdcc3a636b1ec3c77e.jpg)  
+(a) ACM
+
+![](images/cee41955be436e92bc36393f42ca4febddf5415bba5d4f2ce1f32ec6826236ee.jpg)  
+(b）DBLP
+
+![](images/e2ff937fe79daaf0dba1a28c7ca6d090d34c0c14a62907c93173cc0ee9452a81.jpg)  
+Fig. 5. Effect of different variants of the model on the dataset.   
+(a)Impact of λ
+
+![](images/7aa8f1a72c2a0ee2f8180b08f79247290727360d721f99615384efdf318d636c.jpg)  
+(b) Impact of μ
+
+![](images/d283133dbeeda1ddb1fe5964e5de6bb97baa8768d1289e72c15a71deda8e0412.jpg)  
+(c) Impact of n
+
+![](images/96ccb8cce5764345f07cc538a27acedc4b831489c9c7a1beb9d3d5b8c64c2f1d.jpg)  
+Fig. 6. Experimental results of loss function coefficients for ACM dataset.   
+(a)DBLP
+
+![](images/80ada0d1ca7c9d8d065a14a3ec231ec7d40a471bde9368f71c081a73f5d4915d.jpg)  
+(b) IMDB   
+Fig. 7. Performance of SFCDH with different hidden dimensions.
+
+DBLP dataset as learned by the model across four distinct communities, alongside the expressed preferences of each community node. The color gradient in the heatmap indicates the strength of the semantic character within each community, with closer proximity to yellow signifying higher semantic relevance. The brightest color denotes the primary feature of the community, while the slightly dimmer shade represents secondary characteristics. Notably, a significant contrast exists between the primary and secondary features of different communities, highlighting clear distinctions among them. From Fig. 11, one can discern the global traits of each community and their representative characteristics. For instance, communities characterized by a concentration of key traits often emerge as opinion leaders, facilitating effective community management and information governance. Conversely, communities
+
+with scattered primary characteristics may struggle to unify opinions, leading to loose community cohesion, thereby impacting community stability negatively. In summary, the communities derived from the SFCDH model exhibit high interpretability, a crucial factor for practical applications.
+
+# 5.6. Convergence analysis.
+
+Fig. 12 illustrates the loss trends for the AMiner and Texas datasets. Initially, the loss for Texas is quite high but quickly drops to a minimal value in the early stages. In contrast, the loss for Aminer exhibits slight but consistent fluctuations. Ultimately, the losses for both datasets stabilize and converge.
+
+![](images/e68686ca23adfb2ae97a1a6038ca305bc78127cd65ffb1010f02031a3b9f202e.jpg)  
+(a)DBLP
+
+![](images/be3d8bf96a51edbf70b1c37b06946f0cdfbc212be91dce69062cfa2ce06095c4.jpg)  
+(b）IMDB
+
+![](images/8b79aec3a68a08c028334e07def99554da8a93da1adf398422db2d2ac6e39bf2.jpg)  
+Fig. 8. Performance of SFCDH with different hierarchical abstraction trees.   
+Fig. 9. Performance of the network layer.
+
+![](images/826bb1aefa79c111ad549dad3f9c5fe677ce1c5d766744bf1b5893948a817e5d.jpg)  
+Fig. 10. Performance of the dynamic masking strategy.
+
+# 5.7. Analysis of the variation of the homophily ratio guided by the pseudo labels
+
+ACM and IMDB datasets are analyzed in this section about their homophily ratios during model training based on pseudo labels. In Fig. 13(a), $\mathrm { H R } _ { 0 }$ , $\mathrm { H R } _ { 1 }$ , and $\mathrm { H R } _ { S }$ represent the homogeneous subgraphs corresponding to the metapaths PAP and PSP of the ACM dataset as well as the homophily ratio of the high-order fusion graph $S$ , respectively. With the increase in epoch, we can see that $\mathrm { H R } _ { 0 }$ increases and $\mathrm { H R } _ { 1 }$ decreases. However, they are all better than the homophily ratios
+
+![](images/dd6921243a507131816e22d8bb386735a5a9a2135b02a155fc065df97dd37292.jpg)  
+Fig. 11. Community Interpretability.
+
+derived from the original labels of the dataset. The homophily ratios in the model oscillate to a certain degree, but the variation range is not large, and the overall effect remains stable. Since the homophily ratio decreases with increasing epoch for homogeneous graphs, $\mathrm { H R } _ { S }$ is lower than that of $\mathrm { H R } _ { 0 }$ increases and $\mathrm { H R } _ { 1 }$ . Fig. 13(b) shows that as the epoch increases, the homophily ratios of the homogeneous subgraphs corresponding to the metapaths MAM, MDM, and MKM of the IMDB dataset, represented by $\mathrm { H R } _ { 0 }$ , $\mathrm { H R } _ { 1 }$ , and $\mathrm { H R } _ { 2 }$ all decrease. This trend reflects the heterophilous nature of the IMDB dataset. As indicated in Table 2, this dataset exhibits lower homophily ratios across multiple metapath subgraphs. As the model is less effective at the beginning and cannot distinguish between nodes belonging to different communities, many heterophily edges are identified as homophily edges within the graph. Therefore, the homophily ratio of the model is extraordinarily high in the pre-training phase. However, as the epoch increases, the effectiveness of SFCDH improves, and communities become more distinct. This differentiation results in declining homophily ratios that gradually approach, but remain higher than, the actual homophily ratios. The above demonstrates the reasonableness and effectiveness of using pseudo labels to aggregate metapath subgraphs.
+
+# 5.8. Visualization
+
+To understand the results of the models more intuitively, this paper uses the t-SNE technique to visualize the results of different models and compares the results of the VGAER, HeCo, HetGNN-SF, and the SFCDH model proposed in this paper on the DBLP dataset. As shown in Fig. 14, different colors represent different communities. In Fig. 14(a), several communities in VGAER overlap and the nodes of the
+
+![](images/1712b8ba5e94104fd616cf96a3cce505e3bfbddbae7c391bcd15c4cb3c954f5b.jpg)  
+(a)AMiner
+
+![](images/2960a33c588be63ce9ac76ef91f77380e8c9cf7fba782a46070eb74f4a40f1f1.jpg)  
+(b） Texas
+
+![](images/5a0ba07fed62fa0e45a72c4caaca2b73c05f827a152b00f598e2fd660ea0750a.jpg)  
+Fig. 12. Convergence analysis.   
+(a)ACM
+
+![](images/6c6a5fcd285a873b219a92778c48c71551c81ab5377468410ecc78c6053d0628.jpg)  
+(b)IMDB   
+Fig. 13. Changes of the homophily ratio during model training.
+
+![](images/b4a878d18c83ec35d3f7c32caad71401e9efd0f8a276ea81015ee98d69ec1862.jpg)  
+(a)VGAER
+
+![](images/d769d0ccbb29bbac2be27f6b4dc89aa38a32f8635264c5037a3430cc660b9aa1.jpg)  
+(b）HeCo
+
+![](images/8b45b8dc753bab509c36afccc5eab367111a2a71b609571f84c01029236b9531.jpg)  
+(c) HetGNN-SF
+
+![](images/d36a32b04c04e60ff819464bf8df74ea6c24105cb5706cd0341e3a9ddd337290.jpg)  
+(d) SFCDH   
+Fig. 14. Visualization of latent node embeddings on DBLP.
+
+same community are too discrete to be aggregated. In Fig. 14(b), nodes of different communities can be distinguished by HeCo, but nodes of the same community cannot be aggregated. In Fig. 14(c), HetGNN-SF can differentiate most of the nodes of different communities, but many nodes of the same community cannot be aggregated together, leading to a relatively isolated state, as well as overlapping phenomena between communities that are not clearly defined. Fig. 14(d) illustrates the SFCDH model proposed in this paper, where nodes belonging to the same community coalesce into a more dense cluster, and boundaries between the communities become more distinct.
+
+# 5.9. Complexity analysis
+
+To analyze the complexity of the model, we first define several constants, $g$ is the number of homogeneous subnetworks composed of metapaths, $n$ is the number of target nodes, ?? is the number of edges, and $d$ is the feature dimension of each node. The time complexity of algorithm 2 is mainly composed of constructing a high-order fusion graph, constructing a hierarchical abstraction tree, expanding the homogeneous subgraph and a high-order fusion graph, using a heterogeneous masked autoencoder to calculate the attribute and feature reconstruction loss, and finally using the K-means algorithm to obtain the community allocation matrix. The construction
+
+of a high-order fusion graph involves matrix multiplication, which requires the complexity of $O \left( g \times n ^ { 2 } \right)$ , and the time complexity of the construction of a hierarchical abstraction tree is $O ( n \times \log ^ { 2 } \mathfrak { n } ) )$ , the time complexity of masking node attributes and calculating the loss $L _ { \mathrm { { C o s } } }$ of community prototypes is as follows $O ( g \times ( e + n \times k \times$ ??)). The time complexity of the heterogeneous mask autoencoder $O \left( g \times \left( e \times d + n \times d ^ { 2 } \right) \right)$ . Thus, algorithm 2 involves the total complexity as $O \left( g \times \left( e + n \times k \times d + e \times d + n \times d ^ { 2 } \right) + n \times \log ^ { 2 } \mathrm { n } + g \times n ^ { 2 } \right)$ .
+
+To compare the operational efficiency of these 12 methods, we show the overall running time of the community detection algorithm in AMiner and Texas in seconds in Table 9. SFCDH has a shorter running time compared to heterophilous network community detection methods, but its running time is comparable to or slightly less efficient than homogeneous network or heterogeneous network community detection methods. This is because existing heterophilous network community detection methods tend to continuously update the original graph structure during the model training process, which can be time-consuming. However, considering the overall effectiveness of the model, SFCDH still has a significant advantage over other methods combined with the experimental results in Tables 3–8.
+
+Table 9 Running time.   
+
+<table><tr><td></td><td>AMiner</td><td>Texas</td></tr><tr><td>HAN</td><td>89</td><td>45</td></tr><tr><td>DFCN</td><td>1086</td><td>50</td></tr><tr><td>HeCo</td><td>1717</td><td>-</td></tr><tr><td>VGAER</td><td>255</td><td>57</td></tr><tr><td>HetGNN-SF</td><td>1026</td><td>76</td></tr><tr><td>HGMAE</td><td>62</td><td>22</td></tr><tr><td>HoLe</td><td>3114</td><td>513</td></tr><tr><td>DDGAE</td><td>407</td><td>16</td></tr><tr><td>HAESF</td><td>52</td><td>5</td></tr><tr><td>AHGFC</td><td>4622</td><td>2472</td></tr><tr><td>PLCSR</td><td>2700</td><td>201</td></tr><tr><td>SFCDH</td><td>2597</td><td>58</td></tr></table>
+
+# 6. Conclusion and future work
+
+This paper represents the first attempt to address the problem of node embeddings collapse among different communities in heterophilous heterogeneous graphs. This paper proposes an unsupervised community detection method, called SFCDH, with features multilevel structure fusion and strong generalization capabilities for both homophilous and heterophilous graphs. Specifically, SFCDH proposes a hierarchical structure fusion module based on homophily ratio sampling (SFR) to construct a fine-grained high-order fusion graph and then extract node embeddings from the perspective of a tree, which enables it to generalize to metapath subgraphs with varied homophily ratios. Moreover, to enhance the learning of target node features and complex semantics in heterogeneous graphs, an unsupervised graph representation learning module (UGC) is presented that combines community prototype-based contrastive learning with a dynamic masked autoencoder. Finally, different levels of node embeddings, including those from the metapath perspective and the tree perspective, are combined for community detection. Through joint optimization, this paper demonstrates the superiority of SFCDH over state-of-the-art baselines on 6 benchmark datasets including heterophilous and homophilous heterogeneous graphs.
+
+However, additional research can be conducted to improve the performance of SFCDH in the future. Firstly, while this paper’s attribute reconstruction loss relies on the features of target-type nodes, there may be instances in heterogeneous graphs where these features are missing. Although graph structure information can help address these gaps, future work could focus on developing methods for community detection that effectively handle missing node features. Secondly, this paper investigates the heterogeneity of nodes and does not consider the heterogeneity of edges. Edges can have distinct relevance and importance levels; this must be considered when analyzing the graph. Furthermore, we should consider extending the approach to dynamic heterogeneous graphs to detect community structure and study the evolution of communities as features, nodes, and structures dynamically change over time.
+
+# CRediT authorship contribution statement
+
+Mengying Dai: Writing – original draft, Visualization, Methodology, Data curation, Conceptualization. Weimin Li: Writing – review & editing, Supervision, Resources, Conceptualization. Xinyi Zhang: Writing – review & editing. Fangfang Liu: Supervision, Formal analysis. Mingjun Xin: Writing – review & editing, Project administration. Can Wang: Writing – review & editing, Validation.
+
+# Declaration of competing interest
+
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+# Acknowledgments
+
+This work is supported by the National Key Research and Development Program of China (No. 2022YFC3302600). This work is supported by Shanghai Technical Service Center of Science and Engineering Computing, Shanghai University, China.
+
+# Data availability
+
+Data will be made available on request.
+
+# References
+
+[1] M. Wang, C. Wang, J.X. Yu, J. Zhang, Community detection in social networks: an in-depth benchmarking study with a procedure-oriented framework, Proc. the VLDB Endow. 8 (10) (2015) 998–1009.   
+[2] C. Pizzuti, S.E. Rombo, Algorithms and tools for protein–protein interaction networks clustering, with a special focus on population-based stochastic methods, Bioinformatics 30 (10) (2014) 1343–1352.   
+[3] C. Von Ferber, T. Holovatch, Y. Holovatch, V. Palchykov, Public transport networks: empirical analysis and modeling, Eur. Phys. J. B 68 (2009) 261–275.   
+[4] L. Luo, Y. Fang, X. Cao, X. Zhang, W. Zhang, Detecting communities from heterogeneous graphs: A context path-based graph neural network model, in: Proceedings of the 30th ACM International Conference on Information & Knowledge Management, 2021, pp. 1170–1180.   
+[5] Y. Zhao, W. Li, F. Liu, J. Wang, A.M. Luvembe, Integrating heterogeneous structures and community semantics for unsupervised community detection in heterogeneous networks, Expert Syst. Appl. 238 (2024) 121821.   
+[6] Y. Tian, K. Dong, C. Zhang, C. Zhang, N.V. Chawla, Heterogeneous graph masked autoencoders, in: Proceedings of the AAAI Conference on Artificial Intelligence, 37, (8) 2023, pp. 9997–10005.   
+[7] S. Luan, C. Hua, Q. Lu, J. Zhu, M. Zhao, S. Zhang, X.-W. Chang, D. Precup, Revisiting heterophily for graph neural networks, Adv. Neural Inf. Process. Syst. 35 (2022) 1362–1375.   
+[8] X. Shi, H. Lu, Y. He, S. He, Community detection in social network with pairwisely constrained symmetric non-negative matrix factorization, in: Proceedings of the 2015 IEEE/ACM International Conference on Advances in Social Networks Analysis and Mining 2015, 2015, pp. 541–546.   
+[9] D. He, X. You, Z. Feng, D. Jin, X. Yang, W. Zhang, A network-specific Markov random field approach to community detection, in: Proceedings of the AAAI Conference on Artificial Intelligence, 32, (1) 2018.   
+[10] G. Bonifazi, F. Cauteruccio, E. Corradini, M. Marchetti, A. Pierini, G. Terracina, D. Ursino, L. Virgili, An approach to detect backbones of information diffusers among different communities of a social platform, Data Knowl. Eng. 140 (2022) 102048.   
+[11] G. Bonifazi, S. Cecchini, E. Corradini, L. Giuliani, D. Ursino, L. Virgili, Investigating community evolutions in TikTok dangerous and non-dangerous challenges, J. Inf. Sci. (2022) 01655515221116519.   
+[12] N. Kang, Z. Miao, Q.-K. Pan, W. Li, M.F. Tasgetiren, Multi-objective teachinglearning-based optimizer for a multi-weeding robot task assignment problem, Tsinghua Sci. Technol. 29 (5) (2024) 1249–1265.   
+[13] Q. Kong, J. Sun, Z. Xu, Joint orthogonal symmetric non-negative matrix factorization for community detection in attribute network, Knowl.-Based Syst. 283 (2024) 111192.   
+[14] C. Li, X. Guo, W. Lin, Z. Tang, J. Cao, Y. Zhang, Multiplex network community detection algorithm based on motif awareness, Knowl.-Based Syst. 260 (2023) 110136.   
+[15] Y. Liu, Z. Liu, X. Feng, Z. Li, Robust attributed network embedding preserving community information, in: 2022 IEEE 38th International Conference on Data Engineering, ICDE, IEEE, 2022, pp. 1874–1886.   
+[16] J. Hao, W. Zhu, Deep graph clustering with enhanced feature representations for community detection, Appl. Intell. 53 (2) (2023) 1336–1349.   
+[17] H. Sun, Y. Li, B. Lv, W. Yan, L. He, S. Qiao, J. Huang, Graph community infomax, ACM Trans. Knowl. Discov. from Data ( TKDD) 16 (3) (2021) 1–21.   
+[18] B. Li, B. Jing, H. Tong, Graph communal contrastive learning, in: Proceedings of the ACM Web Conference 2022, 2022, pp. 1203–1213.   
+[19] Y. Sun, Y. Yu, J. Han, Ranking-based clustering of heterogeneous information networks with star network schema, in: Proceedings of the 15th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, 2009, pp. 797–806.   
+[20] Z. Li, Z. Pan, Y. Zhang, G. Li, G. Hu, et al., Efficient community detection in heterogeneous social networks, Math. Probl. Eng. 2016 (2016).   
+[21] X. Wang, H. Ji, C. Shi, B. Wang, Y. Ye, P. Cui, P.S. Yu, Heterogeneous graph attention network, in: The World Wide Web Conference, 2019, pp. 2022–2032.   
+[22] C. Zhang, D. Song, C. Huang, A. Swami, N.V. Chawla, Heterogeneous graph neural network, in: Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining, 2019, pp. 793–803.
+
+[23] S. Yun, M. Jeong, R. Kim, J. Kang, H.J. Kim, Graph transformer networks, Adv. Neural Inf. Process. Syst. 32 (2019).   
+[24] D. He, D. Liu, D. Jin, W. Zhang, A stochastic model for detecting heterogeneous link communities in complex networks, in: Proceedings of the AAAI Conference on Artificial Intelligence, 29, (1) 2015.   
+[25] H. Zhao, P. Rui, J. Chen, Y. Zhang, Y. Wang, S. Zhao, J. Tang, Hinchip: heterogeneous information network representation with community hierarchy preserving, Knowl.-Based Syst. 264 (2023) 110343.   
+[26] H. Wei, G. Xiong, Q. Wei, W. Cao, X. Li, Structure-aware attributed heterogeneous network embedding, Knowl. Inf. Syst. 65 (4) (2023) 1769–1785.   
+[27] L. Yang, M. Li, L. Liu, C. Wang, X. Cao, Y. Guo, et al., Diverse message passing for attribute with heterophily, Adv. Neural Inf. Process. Syst. 34 (2021) 4751–4763.   
+[28] X. Li, R. Zhu, Y. Cheng, C. Shan, S. Luo, D. Li, W. Qian, Finding global homophily in graph neural networks when meeting heterophily, in: International Conference on Machine Learning, PMLR, 2022, pp. 13242–13256.   
+[29] E. Chien, J. Peng, P. Li, O. Milenkovic, Adaptive universal generalized PageRank graph neural network, in: International Conference on Learning Representations, 2021.   
+[30] Y. Wu, Y. Wang, L. Hu, J. Hu, DCGNN: Adaptive deep graph convolution for heterophily graphs, Inform. Sci. 666 (2024) 120427.   
+[31] B.-M. Liu, Y.-L. Gao, F. Li, C.-H. Zheng, J.-X. Liu, SLGCN: Structure-enhanced line graph convolutional network for predicting drug–disease associations, Knowl.-Based Syst. 283 (2024) 111187.   
+[32] Y. Zheng, H. Zhang, V.C. Lee, Y. Zheng, X. Wang, S. Pan, Finding the missinghalf: Graph complementary learning for homophily-prone and heterophily-prone graphs, in: Proceedings of the 40th International Conference on Machine Learning, in: ICML’23, JMLR.org, 2023, p. 14, 1788.   
+[33] Z. Wen, Y. Ling, Y. Ren, T. Wu, J. Chen, X. Pu, Z. Hao, L. He, Homophily-related: Adaptive hybrid graph filter for multi-view graph clustering, in: AAAI, 2024, pp. 15841–15849.
+
+[34] D. Zou, H. Peng, X. Huang, R. Yang, J. Li, J. Wu, C. Liu, P.S. Yu, Se-gsl: A general and effective graph structure learning framework through structural entropy optimization, in: Proceedings of the ACM Web Conference 2023, 2023, pp. 499–510.   
+[35] Y. Dong, N.V. Chawla, A. Swami, Metapath2vec: Scalable representation learning for heterogeneous networks, in: Proceedings of the 23rd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, 2017, pp. 135–144.   
+[36] A. Li, X. Yin, B. Xu, D. Wang, J. Han, Y. Wei, Y. Deng, Y. Xiong, Z. Zhang, Decoding topologically associating domains with ultra-low resolution hi-c data by graph structural entropy, Nat. Commun. 9 (1) (2018) 3265.   
+[37] W. Tu, S. Zhou, X. Liu, X. Guo, Z. Cai, E. Zhu, J. Cheng, Deep fusion clustering network, in: Proceedings of the AAAI Conference on Artificial Intelligence, 35, (11) 2021, pp. 9978–9987.   
+[38] X. Wang, N. Liu, H. Han, C. Shi, Self-supervised heterogeneous graph neural network with co-contrastive learning, in: Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining, 2021, pp. 1726–1736.   
+[39] C. Qiu, Z. Huang, W. Xu, H. Li, VGAER: Graph neural network reconstruction based community detection, in: AAAI: DLG-AAAI’22, 2022.   
+[40] C. Li, X. Liu, Y. Yan, Z. Zhao, Q. Zeng, Hetgnn-SF: Self-supervised learning on heterogeneous graph neural network via semantic strength and feature similarity, Appl. Intell. 53 (19) (2023) 21902–21919.   
+[41] M. Gu, G. Yang, S. Zhou, N. Ma, J. Chen, Q. Tan, M. Liu, J. Bu, Homophilyenhanced structure learning for graph clustering, in: Proceedings of the 32nd ACM International Conference on Information and Knowledge Management, 2023, pp. 577–586.   
+[42] X. Wu, W. Lu, Y. Quan, Q. Miao, P.G. Sun, Deep dual graph attention auto-encoder for community detection, Expert Syst. Appl. 238 (2024) 122182.   
+[43] P. Zhu, J. Li, Y. Wang, B. Xiao, J. Zhang, W. Lin, Q. Hu, Boosting pseudo-labeling with curriculum self-reflection for attributed graph clustering, IEEE Trans. Neural Networks Learn. Syst. (2024) 1–14.

@@ -1,0 +1,1 @@
+{"translation": "# 4 实验设置\n\n\n\n我们通过解决以下研究问题（RQs）来全面评估 InlineCoder 的有效性：\n\nRQ1（整体有效性）：与最先进的基线方法相比，InlineCoder 在仓库级代码生成任务上的表现如何？   \nRQ2（消融研究）：InlineCoder 的关键组件对其整体性能的贡献程度如何？   \nRQ3（定性分析）：InlineCoder 中的上下游检索机制如何为代码生成提供有效的上下文？   \nRQ4（领域泛化）：InlineCoder 的性能在不同编程领域间的泛化能力如何？"}
