@@ -397,15 +397,27 @@ def resolve_input(paper_path: str) -> Tuple[str, Optional[str]]:
     """
     解析输入路径，返回 (paper_dir, pdf_path_or_None)。
 
-    - PDF 文件 → paper_dir 为同级目录下 "<stem>-<hash>" 子目录
+    - 纯文件名（如 paper.pdf）→ 从 papers/ 目录查找，输出到 data/<stem>/
+    - 完整路径的 PDF → 输出到 data/<stem>/
     - 目录 → 直接作为 paper_dir
     - .md 文件 → paper_dir 为所在目录
     """
-    p = Path(paper_path).resolve()
+    base_dir = Path(__file__).resolve().parent
+    papers_dir = base_dir / "papers"
+    data_dir = base_dir / "data"
+
+    p = Path(paper_path)
+
+    # 如果不是绝对路径且文件不存在，尝试从 papers/ 目录查找
+    if not p.is_absolute() and not p.exists():
+        candidate = papers_dir / p
+        if candidate.exists():
+            p = candidate
+
+    p = p.resolve()
 
     if p.is_file() and p.suffix.lower() == ".pdf":
-        # 用文件名生成 paper_dir
-        paper_dir = str(p.parent / p.stem)
+        paper_dir = str(data_dir / p.stem)
         return paper_dir, str(p)
 
     elif p.is_dir():
@@ -415,7 +427,7 @@ def resolve_input(paper_path: str) -> Tuple[str, Optional[str]]:
         return str(p.parent), None
 
     else:
-        raise FileNotFoundError(f"路径不存在: {paper_path}")
+        raise FileNotFoundError(f"路径不存在: {paper_path}\n提示: 请将 PDF 放到 {papers_dir} 目录下")
 
 
 def main():
@@ -463,7 +475,6 @@ def main():
     # ── 解析输入 ──
     try:
         paper_dir, pdf_path = resolve_input(args.input)
-        paper_dir = str('./data/' + paper_dir)
     except FileNotFoundError as e:
         logger.error(str(e))
         return 1

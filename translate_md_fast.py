@@ -304,7 +304,8 @@ class FastMarkdownTranslator:
         print()
         print(f"✅ 翻译完成！")
         print(f"📄 输出文件: {output_path}")
-        print(f"📊 缓存目录: {self.cache_dir}")
+
+        self.clear_cache()
 
     def clear_cache(self):
         """清理缓存"""
