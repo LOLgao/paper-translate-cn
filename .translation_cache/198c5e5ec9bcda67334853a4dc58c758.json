@@ -1,1 +1,0 @@
-{"translation": "# 5.6. 收敛性分析。\n\n图12展示了AMiner和Texas数据集的损失趋势。最初，Texas数据集的损失相当高，但在早期阶段迅速降至最小值。相比之下，Aminer数据集的损失表现出轻微但持续的波动。最终，两个数据集的损失都趋于稳定并收敛。\n\n___PROTECTED_45___  \n(a)DBLP\n\n___PROTECTED_44___  \n(b）IMDB\n\n___PROTECTED_43___  \n图8. 不同层次抽象树下SFCDH的性能表现。   \n图9. 网络层的性能表现。\n\n___PROTECTED_42___  \n图10. 动态掩码策略的性能表现。"}

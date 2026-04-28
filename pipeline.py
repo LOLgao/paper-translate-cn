@@ -29,6 +29,9 @@ import zipfile
 import argparse
 import logging
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 from typing import Dict, List, Optional, Tuple
 
 try:
@@ -54,7 +57,7 @@ logger = logging.getLogger("pipeline")
 # ---------------------------------------------------------------------------
 # MinerU 云端 API 配置
 # ---------------------------------------------------------------------------
-MINERU_API_TOKEN = os.getenv("MINERU_API_TOKEN", "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJqdGkiOiIxNzMwMDI4MCIsInJvbCI6IlJPTEVfUkVHSVNURVIiLCJpc3MiOiJPcGVuWExhYiIsImlhdCI6MTc3MTI0MDgxMiwiY2xpZW50SWQiOiJsa3pkeDU3bnZ5MjJqa3BxOXgydyIsInBob25lIjoiIiwib3BlbklkIjpudWxsLCJ1dWlkIjoiOGIwNGM5OWUtODVmNi00ZTI2LThhY2MtNjA2ZTI5MDM4N2Y1IiwiZW1haWwiOiIiLCJleHAiOjE3NzkwMTY4MTJ9.sAPvgVC-MSoPWMpWRE15QjZCajJ5tFsy89FqAiqPBiQ5qktxV5DyjUKTF7tIBaYNEOOnPMloyKhg3Dty4BhQmA")  # ← 在这里填入你的 token，如: "eyJhbGciOiJIUzI1NiIs..."
+MINERU_API_TOKEN = os.getenv("MINERU_API_TOKEN", "")
 MINERU_APPLY_URL = "https://mineru.net/api/v4/file-urls/batch"
 MINERU_QUERY_URL = "https://mineru.net/api/v4/extract-results/batch"
 MINERU_API_OPTIONS = {
