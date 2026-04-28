@@ -368,7 +368,7 @@ def run_translate(paper_dir: str, workers: int = 5) -> bool:
         return False
 
     # 输出到 translate/ 子目录
-    translate_dir = d / "translate"
+    translate_dir = d 
     translate_dir.mkdir(exist_ok=True)
     basename = Path(input_file).stem
     output_file = str(translate_dir / f"{basename}_cn.md")
@@ -460,6 +460,7 @@ def main():
     # ── 解析输入 ──
     try:
         paper_dir, pdf_path = resolve_input(args.input)
+        paper_dir = str('./data/' + paper_dir)
     except FileNotFoundError as e:
         logger.error(str(e))
         return 1
